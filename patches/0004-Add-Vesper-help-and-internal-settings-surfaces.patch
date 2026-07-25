@@ -1,7 +1,7 @@
-From a54557344f948d724ae9238175c1d941ea4f7a3a Mon Sep 17 00:00:00 2001
+From 5a8c7b581c4bbc9f9a6e8abadfe23e2d19cd2035 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:59:37 +0100
-Subject: [PATCH 04/10] Add Vesper help and internal settings surfaces
+Subject: [PATCH 04/11] Add Vesper help and internal settings surfaces
 
 Expose the hidden settings behind seven version taps, replace the visible About content, and route help links to Vesper resources.
 

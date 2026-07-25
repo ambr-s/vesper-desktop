@@ -30,7 +30,7 @@ finish-args:
   - --talk-name=org.kde.StatusNotifierWatcher
   - --env=VESPER_DISABLE_GPU=0
   - --env=VESPER_DISABLE_GPU_SANDBOX=0
-  - --env=VESPER_PASSWORD_STORE=basic
+  - --env=VESPER_PASSWORD_STORE=gnome-libsecret
   - --env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons
 
 modules:

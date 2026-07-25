@@ -32,7 +32,8 @@ flatpak install --user flathub org.flatpak.Builder
 The Flatpak build uses the verified Debian payload and writes
 `artifacts/flatpak/vesper-desktop_<version>_x86_64.flatpak`. The test command
 installs it for the current user as `systems.amber.Vesper` and runs a short
-smoke test.
+smoke test. Vesper stores its database key through the desktop keyring and
+refuses Electron's plaintext password-store backend.
 
 Source work belongs in the ignored `work/` checkout. Mechanical changes live in
 `transforms/`, Vesper-owned files in `overlay/`, and source integration changes in

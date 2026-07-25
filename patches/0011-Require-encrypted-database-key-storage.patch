@@ -1,0 +1,118 @@
+From 959b378acb80674d97f850c8e1caa3cdd84eb1e1 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sat, 25 Jul 2026 22:45:49 +0100
+Subject: [PATCH 11/11] Require encrypted database key storage
+
+---
+ app/main.main.ts | 71 +++++++++++-------------------------------------
+ 1 file changed, 16 insertions(+), 55 deletions(-)
+
+diff --git a/app/main.main.ts b/app/main.main.ts
+index 90858fa41..17e47e92a 100644
+--- a/app/main.main.ts
++++ b/app/main.main.ts
+@@ -1672,15 +1672,21 @@ function getSQLKey(): string {
+   const safeStorageBackend: string | undefined = isLinux
+     ? safeStorage.getSelectedStorageBackend()
+     : undefined;
+-  const isEncryptionAvailable =
++  const shouldUseSafeStorage =
+     // Don't use safeStorage if not packaged and building preload cache or
+     // running test-electron to avoid blocking prompt on macOS CI.
+-    (app.isPackaged ||
+-      (!process.env.GENERATE_PRELOAD_CACHE &&
+-        !isTestEnvironment(getEnvironment()))) &&
++    app.isPackaged ||
++    (!process.env.GENERATE_PRELOAD_CACHE &&
++      !isTestEnvironment(getEnvironment()));
++  const isEncryptionAvailable =
++    shouldUseSafeStorage &&
+     safeStorage.isEncryptionAvailable() &&
+     (!isLinux || safeStorageBackend !== 'basic_text');
+ 
++  if (shouldUseSafeStorage && !isEncryptionAvailable) {
++    throw new Error('Secure database key storage is unavailable');
++  }
++
+   // On Linux the backend can change based on desktop environment and command line flags.
+   // If the backend changes we won't be able to decrypt the key.
+   if (
+@@ -1715,12 +1721,7 @@ function getSQLKey(): string {
+         userConfig.set('key', undefined);
+       } else {
+         log.warn('getSQLKey: decrypted modern key mismatch with legacy key');
+-        const nextStep = handleSafeStorageDecryptionError();
+-        if (nextStep === 'quit') {
+-          throw new SafeStorageDecryptionError();
+-        }
+-
+-        key = legacyKeyValue;
++        throw new SafeStorageDecryptionError();
+       }
+     }
+ 
+@@ -1748,17 +1749,12 @@ function getSQLKey(): string {
+ 
+   if (isEncryptionAvailable) {
+     log.info('getSQLKey: updating encrypted key in the config');
+-    const encrypted = safeStorage.encryptString(key).toString('hex');
+-    userConfig.set('encryptedKey', encrypted);
+-
+-    if (OS.isFlatpak()) {
+-      log.info(
+-        'getSQLKey: updating plaintext key in the config, will confirm decryption on next start'
+-      );
+-      userConfig.set('key', key);
+-    } else {
+-      userConfig.set('key', undefined);
++    const encrypted = safeStorage.encryptString(key);
++    if (safeStorage.decryptString(encrypted) !== key) {
++      throw new SafeStorageDecryptionError();
+     }
++    userConfig.set('encryptedKey', encrypted.toString('hex'));
++    userConfig.set('key', undefined);
+ 
+     if (isLinux && safeStorageBackend) {
+       log.info(`getSQLKey: saving safeStorageBackend: ${safeStorageBackend}`);
+@@ -1772,41 +1768,6 @@ function getSQLKey(): string {
+   return key;
+ }
+ 
+-// In Flatpak, safeStorage encryption may appear to work on the first run but on
+-// subsequent starts the decrypted value may be incorrect.
+-function handleSafeStorageDecryptionError(): 'continue' | 'quit' {
+-  const previousError = userConfig.get('safeStorageDecryptionError');
+-  if (typeof previousError === 'string') {
+-    return 'continue';
+-  }
+-
+-  const { i18n } = getResolvedMessagesLocale();
+-  const message = i18n('icu:systemEncryptionError');
+-  const detail = i18n(
+-    'icu:systemEncryptionError__linuxSafeStorageDecryptionError'
+-  );
+-  const buttons = [
+-    i18n('icu:copyErrorAndQuit'),
+-    i18n('icu:systemEncryptionError__continueWithPlaintextKey'),
+-  ];
+-  const copyErrorAndQuitIndex = 0;
+-  const resultIndex = dialog.showMessageBoxSync({
+-    buttons,
+-    defaultId: copyErrorAndQuitIndex,
+-    cancelId: copyErrorAndQuitIndex,
+-    message,
+-    detail,
+-    icon: getAppErrorIcon(rootDir),
+-    noLink: true,
+-  });
+-  if (resultIndex === copyErrorAndQuitIndex) {
+-    return 'quit';
+-  }
+-
+-  userConfig.set('safeStorageDecryptionError', 'true');
+-  return 'continue';
+-}
+-
+ async function initializeSQL(
+   userDataPath: string
+ ): Promise<{ ok: true; error: undefined } | { ok: false; error: Error }> {

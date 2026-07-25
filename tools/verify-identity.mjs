@@ -210,6 +210,31 @@ if (userConfig.includes("`Signal-${config.get('storageProfile')}`")) {
   throw new Error("Signal development storage identity remains configured");
 }
 
+const mainProcess = await readFile(path.join(checkout, "app/main.main.ts"), {
+  encoding: "utf8",
+});
+for (const expected of [
+  "throw new Error('Secure database key storage is unavailable');",
+  "safeStorage.decryptString(encrypted) !== key",
+  "userConfig.set('key', undefined);",
+]) {
+  if (!mainProcess.includes(expected)) {
+    throw new Error(
+      `Database key storage is missing ${JSON.stringify(expected)}`,
+    );
+  }
+}
+for (const forbidden of [
+  "function handleSafeStorageDecryptionError",
+  "will confirm decryption on next start",
+]) {
+  if (mainProcess.includes(forbidden)) {
+    throw new Error(
+      `Plaintext database key fallback remains: ${JSON.stringify(forbidden)}`,
+    );
+  }
+}
+
 const identitySourceChecks = [
   [
     "app/startup_config.main.ts",

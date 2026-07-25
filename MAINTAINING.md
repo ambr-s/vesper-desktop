@@ -74,8 +74,11 @@ placeholder public keys.
 `org.freedesktop.Platform` 25.08 runtime and Electron2 BaseApp. It refuses a
 Debian package older than the current source commit. `tools/test-flatpak.sh`
 installs the bundle for the current user, checks its desktop and protocol
-identity, confirms the Electron version, and runs Vesper for 20 seconds with
-temporary application data.
+identity, and confirms the Electron version. It then starts Vesper twice with
+temporary application data. The launcher defaults to `gnome-libsecret` and
+rejects Electron's plaintext password store. The test checks that the SQLCipher
+key is encrypted in `config.json`, that no plaintext `key` field exists, and
+that the same profile opens on the second run.
 
 The Flatpak application remains AGPL-3.0-only. Its AppStream metadata is
 CC0-1.0 so software catalogues may copy and index it.
