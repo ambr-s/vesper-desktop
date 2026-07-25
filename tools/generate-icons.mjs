@@ -25,10 +25,51 @@ import { promisify } from "node:util";
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const overlay = path.join(root, "overlay");
 const source = path.join(root, "branding", "vesper-icon.svg");
+const check = process.argv[2] === "--check";
 const pngSizes = [16, 24, 32, 48, 64, 128, 256, 512, 1024];
 const icoSizes = [16, 20, 24, 32, 40, 48, 64, 128, 256];
 const traySizes = [16, 32, 48, 256];
 const execFileAsync = promisify(execFile);
+
+if (process.argv.length > (check ? 3 : 2)) {
+  process.stderr.write("Usage: node tools/generate-icons.mjs [--check]\n");
+  process.exit(2);
+}
+
+function expectBrandTokens(label, sourceText, tokens) {
+  for (const token of tokens) {
+    if (!sourceText.includes(token)) {
+      throw new Error(`${label} is missing ${JSON.stringify(token)}`);
+    }
+  }
+}
+
+const sourceData = await readFile(source);
+expectBrandTokens("Vesper application icon", sourceData.toString("utf8"), [
+  '<stop stop-color="#6341FF"/>',
+  '<stop offset="1" stop-color="#613FFF"/>',
+  'transform="translate(192 192) scale(5)"',
+]);
+expectBrandTokens(
+  "Vesper titlebar icon",
+  await readFile(path.join(overlay, "images", "titlebar_icon.svg"), "utf8"),
+  [
+    '<stop stop-color="#6341FF"/>',
+    '<stop offset="1" stop-color="#613FFF"/>',
+    'transform="translate(6 6) scale(.15625)"',
+  ],
+);
+expectBrandTokens(
+  "Vesper macOS icon",
+  await readFile(
+    path.join(overlay, "build", "icons", "mac", "AppIcon.icon", "icon.json"),
+    "utf8",
+  ),
+  [
+    '"srgb:0.38824,0.25490,1.00000,1.00000"',
+    '"srgb:0.38039,0.24706,1.00000,1.00000"',
+  ],
+);
 
 const image = await loadImage(source);
 
@@ -59,6 +100,13 @@ async function render(size, drawBadge = false) {
 
 async function write(relativePath, data) {
   const target = path.join(overlay, relativePath);
+  if (check) {
+    const existing = await readFile(target);
+    if (!existing.equals(data)) {
+      throw new Error(`Generated Vesper icon is stale: ${relativePath}`);
+    }
+    return;
+  }
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, data);
 }
@@ -194,7 +242,6 @@ icnsHeader.write("icns", 0, 4, "ascii");
 icnsHeader.writeUInt32BE(icnsLength, 4);
 await write("build/dmg/icon.icns", Buffer.concat([icnsHeader, ...icnsChunks]));
 
-const sourceHashInput = await readFile(source);
 console.log(
-  `Generated Vesper icon overlays from ${sourceHashInput.length} source bytes.`,
+  `${check ? "Verified" : "Generated"} Vesper icon overlays from ${sourceData.length} source bytes.`,
 );

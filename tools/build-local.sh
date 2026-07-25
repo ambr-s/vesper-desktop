@@ -66,6 +66,9 @@ NPM_CONFIG_LOGLEVEL=verbose \
 NPM_CONFIG_NODE_GYP=echo \
   pnpm install --frozen-lockfile
 
+echo "Checking generated Vesper icons..."
+node "$ROOT/tools/generate-icons.mjs" --check
+
 echo "Building workspace packages removed by clean rematerialisation..."
 pnpm --filter @signalapp/types build
 pnpm --filter @signalapp/windows-ucv build

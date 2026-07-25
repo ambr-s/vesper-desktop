@@ -1,4 +1,4 @@
-From 0e72f0ae3c7810b692ce67e4a7297808bb126a16 Mon Sep 17 00:00:00 2001
+From 0734d5b209c555c9876b0b2e9fc1469d2f21faba Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:49:16 +0100
 Subject: [PATCH 02/11] Add opt-in diagnostic logging

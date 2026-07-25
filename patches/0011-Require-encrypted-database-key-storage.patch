@@ -1,4 +1,4 @@
-From 959b378acb80674d97f850c8e1caa3cdd84eb1e1 Mon Sep 17 00:00:00 2001
+From 73de7a95d93b5f70fee868f665ef8b3c0fba1d2b Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 22:45:49 +0100
 Subject: [PATCH 11/11] Require encrypted database key storage

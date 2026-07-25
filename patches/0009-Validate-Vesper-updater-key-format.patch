@@ -1,4 +1,4 @@
-From 89c95ca594bdb3a5ac8eb7b5fdc7fc536801f1b9 Mon Sep 17 00:00:00 2001
+From 4df300bf648763acdea301287c73c335d39f86d4 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 20:47:15 +0100
 Subject: [PATCH 09/11] Validate Vesper updater key format
