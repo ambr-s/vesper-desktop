@@ -1,0 +1,221 @@
+# Copyright 2026 Vesper contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+name: Release Vesper Desktop
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vesper-desktop-release
+  cancel-in-progress: false
+
+jobs:
+  linux:
+    name: Publish Linux x64
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    timeout-minutes: 90
+    environment: release
+    env:
+      R2_BUCKET: vesper-desktop-updates
+
+    steps:
+      - name: Check out Vesper patchset
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check release secrets
+        env:
+          UPDATE_PRIVATE_KEY: ${{ secrets.VESPER_DESKTOP_UPDATE_PRIVATE_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.VESPER_DESKTOP_R2_SECRET_ACCESS_KEY }}
+        run: |
+          missing=()
+          for name in \
+            UPDATE_PRIVATE_KEY \
+            R2_ACCOUNT_ID \
+            R2_ACCESS_KEY_ID \
+            R2_SECRET_ACCESS_KEY; do
+            [[ -n "${!name}" ]] || missing+=("$name")
+          done
+          if ((${#missing[@]})); then
+            printf 'Missing required release secret: %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
+      - name: Materialise Vesper
+        run: ./tools/materialize.sh
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: work/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: work/.nvmrc
+          cache: pnpm
+          cache-dependency-path: work/pnpm-lock.yaml
+
+      - name: Cache Electron native builds
+        uses: actions/cache@v5
+        with:
+          path: ~/.electron-gyp
+          key: electron-gyp-${{ runner.os }}-${{ hashFiles('work/pnpm-lock.yaml') }}
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get install -y xvfb libpulse0 ||
+            (sudo apt-get update && sudo apt-get install -y xvfb libpulse0)
+
+      - name: Build and validate Vesper
+        run: ./tools/build-local.sh
+
+      - name: Check release identity
+        run: node tools/verify-identity.mjs --release work
+
+      - name: Locate update files
+        id: update
+        run: |
+          mapfile -t packages < <(
+            find work/release -maxdepth 1 -type f -name '*.deb' | sort
+          )
+          if [[ "${#packages[@]}" -ne 1 ]]; then
+            printf 'Expected one Debian package, found %s.\n' "${#packages[@]}" >&2
+            exit 1
+          fi
+          manifest=work/release/latest-linux.yml
+          [[ -f "$manifest" ]] || {
+            echo "Missing $manifest" >&2
+            exit 1
+          }
+          {
+            echo "package=${packages[0]}"
+            echo "manifest=$manifest"
+            echo "version=$(node -p "require('./work/package.json').version")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify signed release tag
+        env:
+          VERSION: ${{ steps.update.outputs.version }}
+        run: |
+          tag="v$VERSION"
+          expected_ref="refs/tags/$tag"
+          if [[ "$GITHUB_REF" != "$expected_ref" ]]; then
+            echo "Dispatch this workflow from $expected_ref, not $GITHUB_REF." >&2
+            exit 1
+          fi
+          git rev-parse --verify "refs/tags/$tag^{tag}" >/dev/null
+          git verify-tag "$tag"
+          tag_commit="$(git rev-parse "$tag^{commit}")"
+          head_commit="$(git rev-parse HEAD)"
+          if [[ "$tag_commit" != "$head_commit" ]]; then
+            echo "$tag points to $tag_commit, but the build uses $head_commit." >&2
+            exit 1
+          fi
+          tag_object="$(git rev-parse "$tag^{tag}")"
+          remote_tag_object="$(
+            git ls-remote --exit-code origin "$expected_ref" |
+              awk 'NR == 1 { print $1 }'
+          )"
+          if [[ "$remote_tag_object" != "$tag_object" ]]; then
+            echo "Remote $expected_ref does not match the verified local tag." >&2
+            exit 1
+          fi
+
+      - name: Sign and verify update
+        env:
+          UPDATE_PRIVATE_KEY: ${{ secrets.VESPER_DESKTOP_UPDATE_PRIVATE_KEY }}
+          UPDATE_PACKAGE: ${{ steps.update.outputs.package }}
+        run: |
+          key_file="$RUNNER_TEMP/vesper-desktop-update.key"
+          printf '%s' "$UPDATE_PRIVATE_KEY" > "$key_file"
+          (
+            cd work
+            NODE_OPTIONS='--import=tsx' \
+              node ts/updater/signVesperUpdate.node.ts \
+                "../$UPDATE_PACKAGE" \
+                "$key_file"
+            NODE_OPTIONS='--import=tsx' \
+              node ts/updater/verifyVesperUpdate.node.ts "../$UPDATE_PACKAGE"
+          )
+
+      - name: Upload release artefacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: vesper-desktop-${{ steps.update.outputs.version }}-linux-x64
+          path: |
+            ${{ steps.update.outputs.package }}
+            ${{ steps.update.outputs.package }}.sig
+            ${{ steps.update.outputs.manifest }}
+          if-no-files-found: error
+
+      - name: Publish package and metadata
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.VESPER_DESKTOP_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCOUNT_ID }}
+          UPDATE_PACKAGE: ${{ steps.update.outputs.package }}
+          UPDATE_MANIFEST: ${{ steps.update.outputs.manifest }}
+        run: |
+          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          package_name="$(basename "$UPDATE_PACKAGE")"
+          aws s3 cp \
+            "$UPDATE_PACKAGE" \
+            "s3://$R2_BUCKET/desktop/$package_name" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=31536000, immutable'
+          aws s3 cp \
+            "$UPDATE_PACKAGE.sig" \
+            "s3://$R2_BUCKET/desktop/$package_name.sig" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=31536000, immutable' \
+            --content-type 'text/plain'
+          aws s3 cp \
+            "$UPDATE_MANIFEST" \
+            "s3://$R2_BUCKET/desktop/latest-linux.yml" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=300' \
+            --content-type 'text/yaml'
+          for route in challenge registration; do
+            aws s3 cp \
+              release-site/captcha/generate.html \
+              "s3://$R2_BUCKET/captcha/$route/generate.html" \
+              --endpoint-url "$endpoint" \
+              --cache-control 'public, max-age=3600' \
+              --content-type 'text/html'
+          done
+          aws s3 cp \
+            release-site/captcha/vesper-captcha.js \
+            "s3://$R2_BUCKET/captcha/vesper-captcha.js" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=3600' \
+            --content-type 'text/javascript'
+
+      - name: Create draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.update.outputs.version }}
+          UPDATE_PACKAGE: ${{ steps.update.outputs.package }}
+        run: |
+          tag="v$VERSION"
+          gh release create "$tag" \
+            "$UPDATE_PACKAGE" \
+            "$UPDATE_PACKAGE.sig" \
+            --draft \
+            --verify-tag \
+            --title "Vesper $VERSION" \
+            --notes "Vesper Desktop $VERSION for Linux x64."
+
+      - name: Remove updater signing material
+        if: always()
+        run: |
+          key_file="$RUNNER_TEMP/vesper-desktop-update.key"
+          [[ ! -e "$key_file" ]] || shred -u "$key_file"

@@ -1,0 +1,55 @@
+# Copyright 2026 Vesper contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+name: Track upstream Signal Desktop
+
+on:
+  schedule:
+    - cron: "31 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: vesper-desktop-track-upstream
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    name: Detect latest stable Signal Desktop
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare latest release with the known-good pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          candidate="$(./tools/latest-signal-tag.sh)"
+          pinned="$(sed -n 's/^signal=//p' upstream.pin)"
+          if [[ "$candidate" == "$pinned" ]]; then
+            echo "Vesper is based on the latest Signal Desktop release ($pinned)."
+            exit 0
+          fi
+
+          title="Review Signal Desktop $candidate"
+          issue="$(
+            gh issue list \
+              --repo "$GITHUB_REPOSITORY" \
+              --state open \
+              --search "$title in:title" \
+              --json number \
+              --jq '.[0].number // empty'
+          )"
+          body="Signal Desktop $candidate is newer than the known-good Vesper base, $pinned. Materialise the candidate, rebase the feature commits, and run the full local gate before advancing upstream.pin."
+          if [[ -n "$issue" ]]; then
+            gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$title" \
+              --body "$body"
+          fi

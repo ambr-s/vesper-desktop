@@ -1,0 +1,65 @@
+# Copyright 2026 Vesper contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+name: Build Vesper Desktop
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vesper-desktop-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux x64
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out Vesper patchset
+        uses: actions/checkout@v7
+
+      - name: Materialise Vesper
+        run: ./tools/materialize.sh
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: work/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: work/.nvmrc
+          cache: pnpm
+          cache-dependency-path: work/pnpm-lock.yaml
+
+      - name: Cache Electron native builds
+        uses: actions/cache@v5
+        with:
+          path: ~/.electron-gyp
+          key: electron-gyp-${{ runner.os }}-${{ hashFiles('work/pnpm-lock.yaml') }}
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get install -y xvfb libpulse0 ||
+            (sudo apt-get update && sudo apt-get install -y xvfb libpulse0)
+
+      - name: Build and validate Vesper
+        run: ./tools/build-local.sh
+
+      - name: Upload Linux package
+        uses: actions/upload-artifact@v7
+        with:
+          name: vesper-desktop-linux-x64
+          path: work/release/vesper-desktop_*_amd64.deb
+          if-no-files-found: error
+          retention-days: 14
