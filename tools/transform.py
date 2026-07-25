@@ -204,6 +204,10 @@ def transform_strings(checkout: Path) -> None:
             updated = current.replace("Signal Desktop", "Vesper")
             updated = updated.replace("Signal desktop", "Vesper")
             updated = updated.replace("Signal", "Vesper")
+            updated = updated.replace(
+                "signal.org/download",
+                "github.com/ambr-s/vesper-desktop/releases/latest",
+            )
             if updated != current:
                 entry["messageformat"] = updated
                 changed = True
@@ -236,6 +240,26 @@ def transform_channel_scripts(checkout: Path) -> None:
         text = text.replace("'signal", "'vesper")
         text = re.sub(r"(?<=')Signal(?=(?: |'))", "Vesper", text)
         path.write_text(text, encoding="utf-8")
+
+    adhoc_path = checkout / "scripts/prepare_adhoc_build.mjs"
+    replace_exact(
+        adhoc_path,
+        "`Signal Adhoc ${formattedDate}.${shortSha}`",
+        "`Vesper Adhoc ${formattedDate}.${shortSha}`",
+        1,
+    )
+    replace_exact(
+        adhoc_path,
+        "`signal adhoc ${formattedDate} ${shortSha}`",
+        "`vesper adhoc ${formattedDate} ${shortSha}`",
+        1,
+    )
+    replace_exact(
+        adhoc_path,
+        "`signal adhoc ${formattedDate} ${shortSha}.desktop`",
+        "`vesper adhoc ${formattedDate} ${shortSha}.desktop`",
+        1,
+    )
 
 
 def transform_policy_identity(checkout: Path) -> None:

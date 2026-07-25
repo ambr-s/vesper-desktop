@@ -1,7 +1,7 @@
-From 4ca38a04d9ad7c658cc94ea87210449948e0cceb Mon Sep 17 00:00:00 2001
+From 3aa0089fae5782100e75b694f1313f930651905a Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:49:16 +0100
-Subject: [PATCH 2/7] Add opt-in diagnostic logging
+Subject: [PATCH 2/8] Add opt-in diagnostic logging
 
 Keep logging disabled by default, apply changes without a restart, clear local logs and crash reports when disabled, and disable the Debug Log menu item while no logs are being collected.
 
@@ -26,7 +26,7 @@ Adapted from Molly work by Oscar Mira and other Molly contributors.
  16 files changed, 187 insertions(+), 6 deletions(-)
 
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index cfbf9e277..16ae2fc30 100644
+index dbe21bad7..bce612436 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
 @@ -8892,6 +8892,30 @@

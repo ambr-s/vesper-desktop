@@ -1,7 +1,7 @@
-From 940bfc8d61d6aab30a65cc17f3de2ca741f2460c Mon Sep 17 00:00:00 2001
+From ccb3a839b73d4c2534088f71c0eaedc289c4c833 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:54:15 +0100
-Subject: [PATCH 3/7] Preserve messages after remote deletion requests
+Subject: [PATCH 3/8] Preserve messages after remote deletion requests
 
 Add an opt-in privacy setting that keeps ordinary incoming chat messages when their sender deletes them for everyone. Administrator deletions, stories, and our own outgoing messages continue to use Signal's standard deletion path.
 
@@ -46,7 +46,7 @@ index e61ad55f4..f7a33a7f6 100644
  
  export const enforceLicenseComments = ESLintUtils.RuleCreator.withoutDocs({
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index 16ae2fc30..626b0e50b 100644
+index bce612436..ce1e5ccf0 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
 @@ -8916,6 +8916,30 @@

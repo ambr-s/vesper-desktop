@@ -1,7 +1,7 @@
-From f1a9d61fbeb3b8912743586982c018471b8bb7c6 Mon Sep 17 00:00:00 2001
+From e59fdf2eaa0e98882ce69570a617c10d3e730d60 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 19:04:18 +0100
-Subject: [PATCH 5/7] Isolate Vesper protocol handlers
+Subject: [PATCH 5/8] Isolate Vesper protocol handlers
 
 Register Vesper-owned URL schemes, normalise them at the application boundary, and use them for Windows notification launches. Signal's protocol associations remain untouched.
 ---

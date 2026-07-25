@@ -1,0 +1,274 @@
+From b3451ac29a1ef34954f4592ec29cfd1913ba449c Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sat, 25 Jul 2026 20:29:30 +0100
+Subject: [PATCH 8/8] Route Vesper updates and support independently
+
+---
+ ts/components/DialogExpiredBuild.dom.tsx      |  4 +-
+ .../ChatSessionRefreshedNotification.dom.tsx  |  9 ++-
+ .../conversation/UnsupportedMessage.dom.tsx   |  3 +-
+ .../InstallScreenErrorStep.dom.tsx            |  7 ++-
+ .../util/createSupportUrl_test.std.ts         | 20 +++++--
+ ts/types/support.std.ts                       |  6 +-
+ ts/util/contactSupport.dom.tsx                |  4 +-
+ ts/util/createSupportUrl.std.ts               | 56 ++++---------------
+ 8 files changed, 49 insertions(+), 60 deletions(-)
+
+diff --git a/ts/components/DialogExpiredBuild.dom.tsx b/ts/components/DialogExpiredBuild.dom.tsx
+index 386c5d3fa..f129bc3d3 100644
+--- a/ts/components/DialogExpiredBuild.dom.tsx
++++ b/ts/components/DialogExpiredBuild.dom.tsx
+@@ -4,6 +4,7 @@
+ import type { JSX } from 'react';
+ 
+ import type { LocalizerType } from '../types/Util.std.ts';
++import { PRODUCTION_DOWNLOAD_URL } from '../types/support.std.ts';
+ import type { WidthBreakpoint } from './_util.std.ts';
+ 
+ import { LeftPaneDialog } from './LeftPaneDialog.dom.tsx';
+@@ -15,7 +16,6 @@ export type PropsType = {
+   isMAS: boolean;
+ };
+ 
+-const WEBSITE_URL = 'https://signal.org/download/';
+ const APP_STORE_URL =
+   'https://apps.apple.com/app/signal-private-messenger/id1230208093';
+ 
+@@ -29,7 +29,7 @@ export function DialogExpiredBuild({
+       containerWidthBreakpoint={containerWidthBreakpoint}
+       type="error"
+       onClick={() => {
+-        openLinkInWebBrowser(isMAS ? APP_STORE_URL : WEBSITE_URL);
++        openLinkInWebBrowser(isMAS ? APP_STORE_URL : PRODUCTION_DOWNLOAD_URL);
+       }}
+       clickLabel={
+         isMAS
+diff --git a/ts/components/conversation/ChatSessionRefreshedNotification.dom.tsx b/ts/components/conversation/ChatSessionRefreshedNotification.dom.tsx
+index 2d522a7f1..d9d640548 100644
+--- a/ts/components/conversation/ChatSessionRefreshedNotification.dom.tsx
++++ b/ts/components/conversation/ChatSessionRefreshedNotification.dom.tsx
+@@ -9,6 +9,7 @@ import type { LocalizerType } from '../../types/Util.std.ts';
+ import { Button, ButtonSize, ButtonVariant } from '../Button.dom.tsx';
+ import { SystemMessage } from './SystemMessage.dom.tsx';
+ import { ChatSessionRefreshedDialog } from './ChatSessionRefreshedDialog.dom.tsx';
++import { createSupportUrl } from '../../util/createSupportUrl.std.ts';
+ import { openLinkInWebBrowser } from '../../util/openLinkInWebBrowser.dom.ts';
+ 
+ type PropsHousekeepingType = {
+@@ -33,8 +34,12 @@ export function ChatSessionRefreshedNotification(
+   const wrappedContactSupport = useCallback(() => {
+     setIsDialogOpen(false);
+ 
+-    const url =
+-      'https://support.signal.org/hc/requests/new?desktop&chat_refreshed';
++    const url = createSupportUrl({
++      locale: window.SignalContext.getI18nLocale(),
++      query: {
++        context: 'chat session refreshed',
++      },
++    });
+ 
+     openLinkInWebBrowser(url);
+   }, [setIsDialogOpen]);
+diff --git a/ts/components/conversation/UnsupportedMessage.dom.tsx b/ts/components/conversation/UnsupportedMessage.dom.tsx
+index bbc383ec6..15b65e861 100644
+--- a/ts/components/conversation/UnsupportedMessage.dom.tsx
++++ b/ts/components/conversation/UnsupportedMessage.dom.tsx
+@@ -8,6 +8,7 @@ import { Button, ButtonSize, ButtonVariant } from '../Button.dom.tsx';
+ import { ContactName } from './ContactName.dom.tsx';
+ import { I18n } from '../I18n.dom.tsx';
+ import type { LocalizerType } from '../../types/Util.std.ts';
++import { PRODUCTION_DOWNLOAD_URL } from '../../types/support.std.ts';
+ import { openLinkInWebBrowser } from '../../util/openLinkInWebBrowser.dom.ts';
+ 
+ export type ContactType = {
+@@ -91,7 +92,7 @@ export function UnsupportedMessage({
+           <div className="SystemMessage__line">
+             <Button
+               onClick={() => {
+-                openLinkInWebBrowser('https://signal.org/download');
++                openLinkInWebBrowser(PRODUCTION_DOWNLOAD_URL);
+               }}
+               size={ButtonSize.Small}
+               variant={ButtonVariant.SystemMessage}
+diff --git a/ts/components/installScreen/InstallScreenErrorStep.dom.tsx b/ts/components/installScreen/InstallScreenErrorStep.dom.tsx
+index 9ff0789e7..35a97a7fd 100644
+--- a/ts/components/installScreen/InstallScreenErrorStep.dom.tsx
++++ b/ts/components/installScreen/InstallScreenErrorStep.dom.tsx
+@@ -9,7 +9,10 @@ import { openLinkInWebBrowser } from '../../util/openLinkInWebBrowser.dom.ts';
+ import { Button, ButtonVariant } from '../Button.dom.tsx';
+ import { TitlebarDragArea } from '../TitlebarDragArea.dom.tsx';
+ import { InstallScreenSignalLogo } from './InstallScreenSignalLogo.dom.tsx';
+-import { LINK_SIGNAL_DESKTOP } from '../../types/support.std.ts';
++import {
++  LINK_SIGNAL_DESKTOP,
++  PRODUCTION_DOWNLOAD_URL,
++} from '../../types/support.std.ts';
+ import { InstallScreenError } from '../../types/InstallScreen.std.ts';
+ 
+ export type Props = Readonly<{
+@@ -38,7 +41,7 @@ export function InstallScreenErrorStep({
+       errorMessage = i18n('icu:installTooOld');
+       buttonText = i18n('icu:upgrade');
+       onClickButton = () => {
+-        openLinkInWebBrowser('https://signal.org/download');
++        openLinkInWebBrowser(PRODUCTION_DOWNLOAD_URL);
+       };
+       shouldShowQuitButton = true;
+       break;
+diff --git a/ts/test-node/util/createSupportUrl_test.std.ts b/ts/test-node/util/createSupportUrl_test.std.ts
+index 6be343722..94d57fc25 100644
+--- a/ts/test-node/util/createSupportUrl_test.std.ts
++++ b/ts/test-node/util/createSupportUrl_test.std.ts
+@@ -9,22 +9,34 @@ describe('createSupportUrl', () => {
+   it('returns support url for "en" locale', () => {
+     assert.strictEqual(
+       createSupportUrl({ locale: 'en' }),
+-      'https://support.signal.org/hc/en-us/requests/new?desktop'
++      'https://github.com/ambr-s/vesper-desktop/issues/new?' +
++        'title=Vesper+Desktop+support+request&body=Locale%3A+en'
+     );
+   });
+ 
+   it('returns support url for "fr" locale', () => {
+     assert.strictEqual(
+       createSupportUrl({ locale: 'fr' }),
+-      'https://support.signal.org/hc/fr/requests/new?desktop'
++      'https://github.com/ambr-s/vesper-desktop/issues/new?' +
++        'title=Vesper+Desktop+support+request&body=Locale%3A+fr'
+     );
+   });
+ 
+   it('returns support url with a query', () => {
+     assert.strictEqual(
+       createSupportUrl({ locale: 'en', query: { debugLog: 'https://' } }),
+-      'https://support.signal.org/hc/en-us/requests/new?' +
+-        'desktop&debugLog=https%3A%2F%2F'
++      'https://github.com/ambr-s/vesper-desktop/issues/new?' +
++        'title=Vesper+Desktop+support+request&' +
++        'body=Locale%3A+en%0ADebug+log%3A+https%3A%2F%2F'
++    );
++  });
++
++  it('describes a key transparency request', () => {
++    assert.strictEqual(
++      createSupportUrl({ locale: 'en', query: { kt: '' } }),
++      'https://github.com/ambr-s/vesper-desktop/issues/new?' +
++        'title=Vesper+Desktop+support+request&' +
++        'body=Locale%3A+en%0AContext%3A+key+transparency'
+     );
+   });
+ });
+diff --git a/ts/types/support.std.ts b/ts/types/support.std.ts
+index 748f5bdc1..bbe0c3a50 100644
+--- a/ts/types/support.std.ts
++++ b/ts/types/support.std.ts
+@@ -1,8 +1,10 @@
+ // Copyright 2023 Signal Messenger, LLC
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+-export const PRODUCTION_DOWNLOAD_URL = 'https://signal.org/download/';
+-export const BETA_DOWNLOAD_URL = 'https://support.signal.org/beta';
++export const PRODUCTION_DOWNLOAD_URL =
++  'https://github.com/ambr-s/vesper-desktop/releases/latest';
++export const BETA_DOWNLOAD_URL =
++  'https://github.com/ambr-s/vesper-desktop/releases';
+ export const UNSUPPORTED_OS_URL =
+   'https://support.signal.org/hc/articles/5109141421850';
+ export const LINK_SIGNAL_DESKTOP =
+diff --git a/ts/util/contactSupport.dom.tsx b/ts/util/contactSupport.dom.tsx
+index 9907c9502..4760921dd 100644
+--- a/ts/util/contactSupport.dom.tsx
++++ b/ts/util/contactSupport.dom.tsx
+@@ -4,12 +4,12 @@
+ import type { JSX, ReactNode } from 'react';
+ 
+ export const CONTACT_SUPPORT_URL =
+-  'https://support.signal.org/hc/requests/new?desktop';
++  'https://github.com/ambr-s/vesper-desktop/issues/new?title=Vesper+Desktop+support+request';
+ 
+ export function ContactSupportLink(parts: ReactNode): JSX.Element {
+   return (
+     <a
+-      key="signal-support"
++      key="vesper-support"
+       href={CONTACT_SUPPORT_URL}
+       rel="noreferrer"
+       target="_blank"
+diff --git a/ts/util/createSupportUrl.std.ts b/ts/util/createSupportUrl.std.ts
+index 5cba2cb68..6d7ab95d2 100644
+--- a/ts/util/createSupportUrl.std.ts
++++ b/ts/util/createSupportUrl.std.ts
+@@ -1,39 +1,6 @@
+ // Copyright 2022 Signal Messenger, LLC
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+-// the support only provides a subset of languages available within the app
+-// so we have to list them out here and fallback to english if not included
+-const SUPPORT_LANGUAGES = [
+-  'ar',
+-  'bn',
+-  'de',
+-  'en-us',
+-  'es',
+-  'fr',
+-  'hi',
+-  'hi-in',
+-  'hc',
+-  'id',
+-  'it',
+-  'ja',
+-  'ko',
+-  'mr',
+-  'ms',
+-  'nl',
+-  'pl',
+-  'pt',
+-  'ru',
+-  'sv',
+-  'ta',
+-  'te',
+-  'tr',
+-  'uk',
+-  'ur',
+-  'vi',
+-  'zh-cn',
+-  'zh-tw',
+-];
+-
+ export type CreateSupportUrlOptionsType = Readonly<{
+   locale: string;
+   query?: Record<string, string>;
+@@ -43,21 +10,20 @@ export function createSupportUrl({
+   locale,
+   query = {},
+ }: CreateSupportUrlOptionsType): string {
+-  const language = SUPPORT_LANGUAGES.includes(locale) ? locale : 'en-us';
+-
+-  // This URL needs a hardcoded language because the '?desktop' is dropped if
+-  //   the page auto-redirects to the proper URL
+-  const url = new URL(`https://support.signal.org/hc/${language}/requests/new`);
+-
+-  url.searchParams.set('desktop', '');
++  const url = new URL('https://github.com/ambr-s/vesper-desktop/issues/new');
++  url.searchParams.set('title', 'Vesper Desktop support request');
+ 
++  const body = [`Locale: ${locale}`];
+   for (const [key, value] of Object.entries(query)) {
+-    if (key === 'desktop') {
+-      continue;
++    if (key === 'kt' && value === '') {
++      body.push('Context: key transparency');
++    } else if (key === 'debugLog') {
++      body.push(`Debug log: ${value}`);
++    } else {
++      body.push(value ? `${key}: ${value}` : key);
+     }
+-    url.searchParams.set(key, value);
+   }
++  url.searchParams.set('body', body.join('\n'));
+ 
+-  // Support page requires `?desktop&...` not `?desktop=&...`
+-  return url.toString().replace('desktop=', 'desktop');
++  return url.toString();
+ }

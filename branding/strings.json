@@ -34,6 +34,7 @@
   "icu:deleteAllDataBody": "Delete all data and messages from this version of Vesper? Your Signal account and data on your phone or other linked devices will not be deleted.",
   "icu:deleteOldIndexedDBData": "You have obsolete data from a prior installation of Vesper. If you choose to continue, it will be deleted and you will start from scratch.",
   "icu:expiredWarning": "This version of Vesper has expired. Please upgrade to the latest version to continue messaging.",
+  "icu:upgrade": "Open the latest Vesper release",
   "icu:unlinkedWarning": "Click to relink Vesper to your mobile device to continue messaging.",
   "icu:unregisteredWarning": "Click to re-register and continue messaging. Vesper is likely unregistered because you registered your phone number with Vesper on a different device.",
   "icu:messageLoop": "Vesper may be failing to process an incoming message.",
