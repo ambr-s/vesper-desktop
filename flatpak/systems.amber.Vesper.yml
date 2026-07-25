@@ -1,0 +1,76 @@
+# Copyright 2026 Vesper contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+id: systems.amber.Vesper
+base: org.electronjs.Electron2.BaseApp
+base-version: "25.08"
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: vesper-desktop
+separate-locales: false
+
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --device=all
+  - --share=network
+  - --talk-name=org.freedesktop.PowerManagement
+  - --talk-name=org.freedesktop.ScreenSaver
+  - --talk-name=org.gnome.SessionManager
+  - --talk-name=org.freedesktop.secrets
+  - --talk-name=org.kde.kwalletd6
+  - --talk-name=com.canonical.AppMenu.Registrar
+  - --talk-name=com.canonical.Unity
+  - --talk-name=com.canonical.indicator.application
+  - --talk-name=org.ayatana.indicator.application
+  - --talk-name=org.gnome.Mutter.IdleMonitor
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --env=VESPER_DISABLE_GPU=0
+  - --env=VESPER_DISABLE_GPU_SANDBOX=0
+  - --env=VESPER_PASSWORD_STORE=basic
+  - --env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons
+
+modules:
+  - name: vesper-desktop
+    buildsystem: simple
+    build-commands:
+      - |
+        bsdtar -Oxf vesper-desktop.deb data.tar.xz |
+          bsdtar -xf - --exclude='./usr/share/doc'
+      - mv opt/Vesper "${FLATPAK_DEST}/Vesper"
+      - printf 'flatpak' > "${FLATPAK_DEST}/Vesper/resources/package-type"
+      - touch "${FLATPAK_DEST}/Vesper/.vesper-postinst"
+      - install -Dm0644 "usr/share/applications/vesper-desktop.desktop" "${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop"
+      - |
+        for size in 16 24 32 48 64 128 256 512; do
+          install -Dm0644 \
+            "usr/share/icons/hicolor/${size}x${size}/apps/vesper-desktop.png" \
+            "${FLATPAK_DEST}/share/icons/hicolor/${size}x${size}/apps/${FLATPAK_ID}.png"
+        done
+      - install -Dm0755 vesper-desktop.sh "${FLATPAK_DEST}/bin/vesper-desktop"
+      - install -Dm0644 "${FLATPAK_ID}.metainfo.xml" "${FLATPAK_DEST}/share/metainfo/${FLATPAK_ID}.metainfo.xml"
+      - install -Dm0644 LICENSE "${FLATPAK_DEST}/share/licenses/${FLATPAK_ID}/LICENSE"
+      - install -Dm0644 NOTICE "${FLATPAK_DEST}/share/doc/${FLATPAK_ID}/NOTICE"
+      - desktop-file-edit --set-key=Exec --set-value='vesper-desktop %U' "${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop"
+      - desktop-file-edit --set-key=Icon --set-value="${FLATPAK_ID}" "${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop"
+      - desktop-file-edit --set-key=X-Flatpak-RenamedFrom --set-value='vesper-desktop.desktop;' "${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop"
+      - patch-electron-desktop-filename "${FLATPAK_DEST}/Vesper/resources/app.asar"
+    sources:
+      - type: file
+        path: ../artifacts/flatpak/source/vesper-desktop.deb
+        dest-filename: vesper-desktop.deb
+        only-arches:
+          - x86_64
+      - type: file
+        path: vesper-desktop.sh
+      - type: file
+        path: systems.amber.Vesper.metainfo.xml
+      - type: file
+        path: ../LICENSE
+        dest-filename: LICENSE
+      - type: file
+        path: ../NOTICE
+        dest-filename: NOTICE

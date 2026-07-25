@@ -71,14 +71,22 @@ jobs:
 
       - name: Install Linux build dependencies
         run: |
-          sudo apt-get install -y xvfb libpulse0 ||
-            (sudo apt-get update && sudo apt-get install -y xvfb libpulse0)
+          sudo apt-get install -y xvfb libpulse0 flatpak flatpak-builder ||
+            (
+              sudo apt-get update &&
+              sudo apt-get install -y xvfb libpulse0 flatpak flatpak-builder
+            )
 
       - name: Build and validate Vesper
         run: ./tools/build-local.sh
 
       - name: Check release identity
         run: node tools/verify-identity.mjs --release work
+
+      - name: Build and test Flatpak
+        run: |
+          ./tools/build-flatpak.sh
+          ./tools/test-flatpak.sh
 
       - name: Locate update files
         id: update
@@ -95,9 +103,22 @@ jobs:
             echo "Missing $manifest" >&2
             exit 1
           }
+          mapfile -t flatpaks < <(
+            find artifacts/flatpak \
+              -maxdepth 1 \
+              -type f \
+              -name '*.flatpak' |
+              sort
+          )
+          if [[ "${#flatpaks[@]}" -ne 1 ]]; then
+            printf 'Expected one Flatpak bundle, found %s.\n' \
+              "${#flatpaks[@]}" >&2
+            exit 1
+          fi
           {
             echo "package=${packages[0]}"
             echo "manifest=$manifest"
+            echo "flatpak=${flatpaks[0]}"
             echo "version=$(node -p "require('./work/package.json').version")"
           } >> "$GITHUB_OUTPUT"
 
@@ -154,6 +175,7 @@ jobs:
             ${{ steps.update.outputs.package }}
             ${{ steps.update.outputs.package }}.sig
             ${{ steps.update.outputs.manifest }}
+            ${{ steps.update.outputs.flatpak }}
           if-no-files-found: error
 
       - name: Publish package and metadata
@@ -204,11 +226,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.update.outputs.version }}
           UPDATE_PACKAGE: ${{ steps.update.outputs.package }}
+          FLATPAK_PACKAGE: ${{ steps.update.outputs.flatpak }}
         run: |
           tag="v$VERSION"
           gh release create "$tag" \
             "$UPDATE_PACKAGE" \
             "$UPDATE_PACKAGE.sig" \
+            "$FLATPAK_PACKAGE" \
             --draft \
             --verify-tag \
             --title "Vesper $VERSION" \

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 Vesper contributors -->
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<component type="desktop-application">
+  <id>systems.amber.Vesper</id>
+  <name>Vesper</name>
+  <summary>Desktop client for private Signal messaging</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <developer id="systems.amber">
+    <name>Vesper contributors</name>
+  </developer>
+  <url type="homepage">https://github.com/ambr-s</url>
+  <launchable type="desktop-id">systems.amber.Vesper.desktop</launchable>
+  <description>
+    <p>
+      Vesper is an independent desktop client for the Signal service. It uses
+      its own application data and protocol handlers, so it can be installed
+      alongside Signal Desktop.
+    </p>
+    <p>
+      A Signal account on a phone is required before the desktop client can be
+      linked.
+    </p>
+  </description>
+  <provides>
+    <binary>vesper-desktop</binary>
+    <id>vesper-desktop.desktop</id>
+  </provides>
+  <releases>
+    <release version="8.20.0" date="2026-07-25">
+      <description>
+        <p>
+          Packages Vesper Desktop 8.20.0 for Linux with an independently
+          installable Flatpak.
+        </p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>

@@ -50,16 +50,26 @@ jobs:
 
       - name: Install Linux build dependencies
         run: |
-          sudo apt-get install -y xvfb libpulse0 ||
-            (sudo apt-get update && sudo apt-get install -y xvfb libpulse0)
+          sudo apt-get install -y xvfb libpulse0 flatpak flatpak-builder ||
+            (
+              sudo apt-get update &&
+              sudo apt-get install -y xvfb libpulse0 flatpak flatpak-builder
+            )
 
       - name: Build and validate Vesper
         run: ./tools/build-local.sh
 
-      - name: Upload Linux package
+      - name: Build and test Flatpak
+        run: |
+          ./tools/build-flatpak.sh
+          ./tools/test-flatpak.sh
+
+      - name: Upload Linux packages
         uses: actions/upload-artifact@v7
         with:
           name: vesper-desktop-linux-x64
-          path: work/release/vesper-desktop_*_amd64.deb
+          path: |
+            work/release/vesper-desktop_*_amd64.deb
+            artifacts/flatpak/vesper-desktop_*_x86_64.flatpak
           if-no-files-found: error
           retention-days: 14

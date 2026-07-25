@@ -12,6 +12,7 @@ __pycache__/
 *.deb
 *.dmg
 *.AppImage
+*.flatpak
 *.exe
 *.msi
 *.rpm
