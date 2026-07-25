@@ -366,6 +366,12 @@ def transform_miscellaneous_identity(checkout: Path) -> None:
         1,
     )
     replace_exact(
+        checkout / "ACKNOWLEDGMENTS.md",
+        "Signal Desktop makes use of the following open source projects.",
+        "Vesper makes use of the following open source projects.",
+        1,
+    )
+    replace_exact(
         checkout / "scripts/symbolicate-crash-report.mjs",
         "filename.startsWith('signal-desktop-')",
         "filename.startsWith('vesper-desktop-')",
