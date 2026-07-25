@@ -19,21 +19,21 @@ The following Vesper Android commits were used as implementation references.
 Their author is amber <amber@flourish.ch>, and their licence is
 AGPL-3.0-only:
 
-* 75baecf9567be5b77c66de98f92e8929f9ea26eb, static appearance and theme
+- 75baecf9567be5b77c66de98f92e8929f9ea26eb, static appearance and theme
   intent. Relevant paths include
   app/src/main/res/values/colors.xml and
   core-ui/src/main/java/org/signal/core/ui/compose/theme/SignalTheme.kt.
-* 74100891225001d82d27c158d149b459e84dcf03, optional diagnostic logging.
+- 74100891225001d82d27c158d149b459e84dcf03, optional diagnostic logging.
   Relevant paths include
   app/src/main/java/org/thoughtcrime/securesms/components/settings/app/help/HelpSettingsState.kt,
   app/src/main/java/org/thoughtcrime/securesms/util/TextSecurePreferences.java
   and core/util-jvm/src/main/java/org/signal/core/util/logging/Log.kt.
-* d28d0771cc85e9447c874ee1e37d83f851adc4c1, preservation of remote
+- d28d0771cc85e9447c874ee1e37d83f851adc4c1, preservation of remote
   deletion requests. Relevant paths include
   app/src/main/java/org/thoughtcrime/securesms/messages/DataMessageProcessor.kt
   and
   app/src/main/java/org/thoughtcrime/securesms/messages/PreservedRemoteDelete.kt.
-* 5269aee2e2ffe695482ded13e9266d92fd2e04e6, Vesper settings and help
+- 5269aee2e2ffe695482ded13e9266d92fd2e04e6, Vesper settings and help
   surfaces. Relevant paths include
   app/src/main/java/org/thoughtcrime/securesms/components/settings/app/help/HelpSettingsFragment.kt
   and HelpSettingsViewModel.kt in the same directory.
@@ -43,17 +43,17 @@ https://github.com/mollyim/mollyim-android
 
 Oscar Mira <valldrac@molly.im> authored these source commits:
 
-* 794df8f8a328d20d6915e8685e0ddfe55757a1df, Refactor Molly settings.
+- 794df8f8a328d20d6915e8685e0ddfe55757a1df, Refactor Molly settings.
   Relevant paths are HelpSettingsFragment.kt, HelpSettingsState.kt and
   HelpSettingsViewModel.kt under
   app/src/main/java/org/thoughtcrime/securesms/components/settings/app/help/,
   plus app/src/main/java/org/thoughtcrime/securesms/util/TextSecurePreferences.java.
   The source revision is GPL-3.0-only.
-* d6cc48d6f1b6c235755d27a3b2cd9c69351f6529, Prompt to confirm debug log
+- d6cc48d6f1b6c235755d27a3b2cd9c69351f6529, Prompt to confirm debug log
   deletion. The relevant paths are HelpSettingsFragment.kt and
   HelpSettingsViewModel.kt in the directory above. The source revision is
   GPL-3.0-only.
-* 52e79f20d6750e4d9464d0af488ab7b39ba4d0b7, Add dynamic color theme, and
+- 52e79f20d6750e4d9464d0af488ab7b39ba4d0b7, Add dynamic color theme, and
   3457d76f6cc828c39f842c8278512bebd6576d84, Add dynamic color settings.
   Relevant paths include app/src/main/res/values-v31/colors_dynamic.xml,
   app/src/main/res/values-v31/themes_dynamic.xml,
@@ -66,6 +66,18 @@ adapts the documented behaviour to Signal Desktop's Electron architecture.
 Oscar Mira and other Molly contributors retain copyright in the Android work
 from which that behaviour descends. Molly is an independent project and does
 not endorse Vesper.
+
+The Flatpak manifest and launcher adapt packaging from the Flathub
+org.signal.Signal repository:
+https://github.com/flathub/org.signal.Signal
+
+The reference revision is
+4b01aa79a739df6ff109d133865a967995bb73a4. Relevant source files are
+org.signal.Signal.yaml and signal-desktop.sh. Bernhard Bermeitinger and other
+Flathub contributors authored that packaging under CC0-1.0. Vesper keeps the
+runtime and zypak mechanics but uses its own application identity, locally
+built payload, launcher text and update configuration. The Vesper AppStream
+metadata is also CC0-1.0.
 
 Vesper's original Desktop code, scripts and artwork are copyright their Vesper
 contributors and are licensed AGPL-3.0-only. Other dependencies and notices

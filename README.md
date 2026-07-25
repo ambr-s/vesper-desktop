@@ -20,6 +20,20 @@ The script installs Signal Desktop's pinned Node and pnpm dependencies, runs the
 checks, and builds a Linux x64 Debian package in `work/release/`. It prints the
 package path and SHA-256 checksum when it finishes.
 
+To build the Flatpak, install `flatpak-builder` through your package manager or
+install its user-scoped Flatpak:
+
+```bash
+flatpak install --user flathub org.flatpak.Builder
+./tools/build-flatpak.sh
+./tools/test-flatpak.sh
+```
+
+The Flatpak build uses the verified Debian payload and writes
+`artifacts/flatpak/vesper-desktop_<version>_x86_64.flatpak`. The test command
+installs it for the current user as `systems.amber.Vesper` and runs a short
+smoke test.
+
 Source work belongs in the ignored `work/` checkout. Mechanical changes live in
 `transforms/`, Vesper-owned files in `overlay/`, and source integration changes in
 `patches/`. Commit and test a change in `work/`, then run `./tools/export.sh`.
