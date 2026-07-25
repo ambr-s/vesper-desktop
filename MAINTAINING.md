@@ -24,18 +24,19 @@ same checks.
 
 The sibling `../vesper-android` project is the behavioural reference.
 
-| Android behaviour | Desktop status | Desktop treatment |
-| --- | --- | --- |
-| Vesper product identity and branding | Implemented | Own package name, application ID, executable, desktop entry, storage, icons and protocol handlers |
-| Production and development coexistence | Implemented | Development Vesper has separate package, application ID, executable, desktop entry and protocols |
-| Light, dark and system appearance | Implemented | Existing Desktop theme modes use Vesper's static palette |
-| Optional diagnostic logging | Implemented | Off by default; disabling asks for confirmation and clears local logs and crash reports |
-| Preserve remote deletion requests | Implemented | Off by default; applies only to ordinary incoming messages and adds a local marker |
-| Vesper settings and help | Implemented | Public Vesper settings, Vesper About content and internal settings after seven version clicks |
-| Independent update channel | Implemented, release-blocked | Desktop-only host, signing key and R2 credentials; release validation rejects placeholder keys |
-| APK variants and Firebase configuration | Not applicable | Android packaging only |
-| MobileCoin 16 KB compatibility | Not applicable | Android native-library constraint |
-| Direct Material You APIs | Not applicable | Desktop keeps its native light, dark and system theme model |
+| Android behaviour                       | Desktop status               | Desktop treatment                                                                                 |
+| --------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------- |
+| Vesper product identity and branding    | Implemented                  | Own package name, application ID, executable, desktop entry, storage, icons and protocol handlers |
+| Production and development coexistence  | Implemented                  | Development Vesper has separate package, application ID, executable, desktop entry and protocols  |
+| Light, dark and system appearance       | Implemented                  | Existing Desktop theme modes use Vesper's static palette                                          |
+| Optional diagnostic logging             | Implemented                  | Off by default; disabling asks for confirmation and clears local logs and crash reports           |
+| Preserve remote deletion requests       | Implemented                  | Off by default; applies only to ordinary incoming messages and adds a local marker                |
+| Vesper settings and help                | Implemented                  | Public Vesper settings, Vesper About content and internal settings after seven version clicks     |
+| Independent update channel              | Implemented, release-blocked | Desktop-only host, signing key and R2 credentials; release validation rejects placeholder keys    |
+| Android resource qualifiers             | Not applicable               | Android resource-selection mechanism                                                              |
+| APK variants and Firebase configuration | Not applicable               | Android packaging only                                                                            |
+| MobileCoin 16 KB compatibility          | Not applicable               | Android native-library constraint                                                                 |
+| Direct Material You APIs                | Not applicable               | Desktop keeps its native light, dark and system theme model                                       |
 
 ## Release
 
