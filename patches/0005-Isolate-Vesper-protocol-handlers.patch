@@ -1,4 +1,4 @@
-From e59fdf2eaa0e98882ce69570a617c10d3e730d60 Mon Sep 17 00:00:00 2001
+From c3cc5f0c96a6ce4a2e0459a48ea61a5227143a5d Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 19:04:18 +0100
 Subject: [PATCH 5/8] Isolate Vesper protocol handlers

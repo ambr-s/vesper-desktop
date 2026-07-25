@@ -1,4 +1,4 @@
-From ccb3a839b73d4c2534088f71c0eaedc289c4c833 Mon Sep 17 00:00:00 2001
+From fce051cffdf5f116209ab9f69933e091f789d64f Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:54:15 +0100
 Subject: [PATCH 3/8] Preserve messages after remote deletion requests

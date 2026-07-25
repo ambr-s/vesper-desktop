@@ -123,8 +123,13 @@ for (const relativePath of [
   const source = await readFile(path.join(checkout, relativePath), {
     encoding: "utf8",
   });
-  if (source.includes("signal.org/download")) {
-    throw new Error(`Signal download route remains in ${relativePath}`);
+  for (const forbidden of [
+    "signal.org/download",
+    "apps.apple.com/app/signal-private-messenger",
+  ]) {
+    if (source.includes(forbidden)) {
+      throw new Error(`Signal download route remains in ${relativePath}`);
+    }
   }
 }
 
@@ -203,6 +208,76 @@ if (!userConfig.includes("`Vesper-${config.get('storageProfile')}`")) {
 }
 if (userConfig.includes("`Signal-${config.get('storageProfile')}`")) {
   throw new Error("Signal development storage identity remains configured");
+}
+
+const identitySourceChecks = [
+  [
+    "app/startup_config.main.ts",
+    "`systems.amber.${packageJson.name}`",
+    "`org.whispersystems.${packageJson.name}`",
+  ],
+  [
+    "ts/state/ducks/installer.preload.ts",
+    "OS.getName() || 'Vesper'",
+    "OS.getName() || 'Signal Desktop'",
+  ],
+  [
+    "ts/services/notifications.preload.ts",
+    "FALLBACK_NOTIFICATION_TITLE = 'Vesper'",
+    "FALLBACK_NOTIFICATION_TITLE = 'Signal'",
+  ],
+  [
+    "ts/windows/main/attachments.preload.ts",
+    "const appName = 'Vesper'",
+    "const appName = 'Signal'",
+  ],
+  [
+    "ts/state/smart/ToastManager.preload.tsx",
+    "`vesper-desktop-${Date.now()}.heapsnapshot`",
+    "`signal-desktop-${Date.now()}.heapsnapshot`",
+  ],
+  [
+    "scripts/generate-acknowledgments.mjs",
+    "'Vesper makes use of the following open source projects.'",
+    "'Signal Desktop makes use of the following open source projects.'",
+  ],
+  [
+    "scripts/test-release.mjs",
+    "const tmpApp = join(tmpFolder, 'Vesper');",
+    "const tmpApp = join(tmpFolder, 'Signal');",
+  ],
+];
+for (const [relativePath, expected, forbidden] of identitySourceChecks) {
+  const source = await readFile(path.join(checkout, relativePath), {
+    encoding: "utf8",
+  });
+  if (!source.includes(expected)) {
+    throw new Error(`${relativePath} is missing ${JSON.stringify(expected)}`);
+  }
+  if (source.includes(forbidden)) {
+    throw new Error(`${relativePath} retains ${JSON.stringify(forbidden)}`);
+  }
+}
+
+const symbolicateSource = await readFile(
+  path.join(checkout, "scripts/symbolicate-crash-report.mjs"),
+  { encoding: "utf8" },
+);
+for (const expected of [
+  "filename.startsWith('vesper-desktop-')",
+  "filename.startsWith('Vesper')",
+]) {
+  if (!symbolicateSource.includes(expected)) {
+    throw new Error(`Crash symbolication is missing ${expected}`);
+  }
+}
+for (const forbidden of [
+  "filename.startsWith('signal-desktop-')",
+  "filename.startsWith('Signal')",
+]) {
+  if (symbolicateSource.includes(forbidden)) {
+    throw new Error(`Signal crash identity remains: ${forbidden}`);
+  }
 }
 
 const builderPatch = await readFile(

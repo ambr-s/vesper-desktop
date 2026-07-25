@@ -1,4 +1,4 @@
-From 1732f8c0a333514035134e3cfe0c921166eedc75 Mon Sep 17 00:00:00 2001
+From 827b168ae4b87119d085d3e5fdc0a1cd760b76f1 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:59:37 +0100
 Subject: [PATCH 4/8] Add Vesper help and internal settings surfaces

@@ -318,6 +318,12 @@ def transform_miscellaneous_identity(checkout: Path) -> None:
     replace_exact(menu_test_path, "'Quit Signal'", "'Quit Vesper'", 2)
 
     replace_exact(
+        checkout / "app/startup_config.main.ts",
+        "`org.whispersystems.${packageJson.name}`",
+        "`systems.amber.${packageJson.name}`",
+        1,
+    )
+    replace_exact(
         checkout / "app/user_config.main.ts",
         "`Signal-${config.get('storageProfile')}`",
         "`Vesper-${config.get('storageProfile')}`",
@@ -327,6 +333,54 @@ def transform_miscellaneous_identity(checkout: Path) -> None:
         checkout / "ts/logging/uploadDebugLog.node.ts",
         "signal-desktop-debug-log-",
         "vesper-desktop-debug-log-",
+        1,
+    )
+    replace_exact(
+        checkout / "ts/state/ducks/installer.preload.ts",
+        "OS.getName() || 'Signal Desktop'",
+        "OS.getName() || 'Vesper'",
+        1,
+    )
+    replace_exact(
+        checkout / "ts/services/notifications.preload.ts",
+        "FALLBACK_NOTIFICATION_TITLE = 'Signal'",
+        "FALLBACK_NOTIFICATION_TITLE = 'Vesper'",
+        1,
+    )
+    replace_exact(
+        checkout / "ts/windows/main/attachments.preload.ts",
+        "const appName = 'Signal'",
+        "const appName = 'Vesper'",
+        1,
+    )
+    replace_exact(
+        checkout / "ts/state/smart/ToastManager.preload.tsx",
+        "`signal-desktop-${Date.now()}.heapsnapshot`",
+        "`vesper-desktop-${Date.now()}.heapsnapshot`",
+        1,
+    )
+    replace_exact(
+        checkout / "scripts/generate-acknowledgments.mjs",
+        "'Signal Desktop makes use of the following open source projects.'",
+        "'Vesper makes use of the following open source projects.'",
+        1,
+    )
+    replace_exact(
+        checkout / "scripts/symbolicate-crash-report.mjs",
+        "filename.startsWith('signal-desktop-')",
+        "filename.startsWith('vesper-desktop-')",
+        1,
+    )
+    replace_exact(
+        checkout / "scripts/symbolicate-crash-report.mjs",
+        "filename.startsWith('Signal')",
+        "filename.startsWith('Vesper')",
+        1,
+    )
+    replace_exact(
+        checkout / "scripts/test-release.mjs",
+        "const tmpApp = join(tmpFolder, 'Signal');",
+        "const tmpApp = join(tmpFolder, 'Vesper');",
         1,
     )
     builder_patch = checkout / "patches/app-builder-lib.patch"
