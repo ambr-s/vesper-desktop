@@ -1,0 +1,301 @@
+From a0dfe3027faa845e8ca958580244c5247f3309c7 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sat, 25 Jul 2026 18:44:33 +0100
+Subject: [PATCH 1/7] Use the Vesper static colour palette
+
+Apply the Android palette to Desktop's legacy and Axo colour tokens while preserving the existing light, dark, and system theme modes.
+---
+ app/main.main.ts                  |   6 +-
+ stylesheets/_variables.scss       |  20 ++---
+ ts/axo/_tailwind-theme/colors.css | 118 +++++++++++++++---------------
+ 3 files changed, 72 insertions(+), 72 deletions(-)
+
+diff --git a/app/main.main.ts b/app/main.main.ts
+index 066eb919f..8f2f9f8a2 100644
+--- a/app/main.main.ts
++++ b/app/main.main.ts
+@@ -369,9 +369,9 @@ type GetBackgroundColorOptionsType = GetThemeSettingOptionsType &
+     signalColors?: boolean;
+   }>;
+ 
+-const AXO_COLOR_BRAND_LOGO = '#3b45fd';
+-const AXO_COLOR_SURFACE_PRIMARY_LIGHT = '#fafafa';
+-const AXO_COLOR_SURFACE_PRIMARY_DARK = '#191919';
++const AXO_COLOR_BRAND_LOGO = '#7152ff';
++const AXO_COLOR_SURFACE_PRIMARY_LIGHT = '#f6f6ff';
++const AXO_COLOR_SURFACE_PRIMARY_DARK = '#100e1f';
+ 
+ async function getBackgroundColor(
+   options?: GetBackgroundColorOptionsType
+diff --git a/stylesheets/_variables.scss b/stylesheets/_variables.scss
+index 90b3172cd..96231c312 100644
+--- a/stylesheets/_variables.scss
++++ b/stylesheets/_variables.scss
+@@ -24,7 +24,7 @@ $monospace:
+ 
+ // -- V3 Colors
+ 
+-$color-accent-blue: #2c6bed;
++$color-accent-blue: #7152ff;
+ $color-accent-green: #4caf50;
+ $color-accent-red: #f44336;
+ $color-accent-yellow: #ffd624;
+@@ -87,14 +87,14 @@ $color-black-alpha-90: rgba($color-black, 0.9);
+ 
+ $color-transparent: rgba(0, 0, 0, 0);
+ 
+-$color-ultramarine-dark: #1851b4;
+-$color-ultramarine-logo: #3b45fd;
+-$color-ultramarine-light: #6191f3;
+-$color-ultramarine-dawn: #406ec9;
+-$color-ultramarine-pastel: #abc4f8;
+-$color-ultramarine-pale: #d2dffb;
+-$color-ultramarine: #2c6bed;
+-$color-link: #315ff4;
++$color-ultramarine-dark: #3e24b4;
++$color-ultramarine-logo: #7152ff;
++$color-ultramarine-light: #aa98ff;
++$color-ultramarine-dawn: #5335dd;
++$color-ultramarine-pastel: #c8bdff;
++$color-ultramarine-pale: #e5dfff;
++$color-ultramarine: #7152ff;
++$color-link: #5335dd;
+ 
+ // Flat colors
+ 
+@@ -118,7 +118,7 @@ $color-orange: #ff9500;
+ 
+ $color-ultramarine-gradient: (
+   deg: 180deg,
+-  start: #0552f0,
++  start: #8d75ff,
+   end: $color-ultramarine,
+ );
+ $color-basil: (
+diff --git a/ts/axo/_tailwind-theme/colors.css b/ts/axo/_tailwind-theme/colors.css
+index 1b27b4fca..4e5974eda 100644
+--- a/ts/axo/_tailwind-theme/colors.css
++++ b/ts/axo/_tailwind-theme/colors.css
+@@ -19,7 +19,7 @@
+  */
+ 
+ @theme {
+-  --axo-color-brand-primary: #3b45fd;
++  --axo-color-brand-primary: #7152ff;
+ }
+ 
+ /**
+@@ -138,32 +138,32 @@
+ 
+ /* prettier-ignore */
+ @theme {
+-  --axo-color-label-accent:               light-dark(#030ffc, #99a1ff);
+-  --axo-color-label-accent-disabled:      light-dark(--alpha(#030ffc / 25%), --alpha(#99a1ff / 25%));
++  --axo-color-label-accent:               light-dark(#5335dd, #aa98ff);
++  --axo-color-label-accent-disabled:      light-dark(--alpha(#5335dd / 25%), --alpha(#aa98ff / 25%));
+   --axo-color-label-affirmative:          light-dark(#00a015, #30d150);
+   --axo-color-label-affirmative-disabled: light-dark(--alpha(#00a015 / 25%), --alpha(#30d150 / 25%));
+   --axo-color-label-warning:              light-dark(#332900, #ffde5b);
+   --axo-color-label-warning-disabled:     light-dark(--alpha(#332900 / 25%), --alpha(#ffde5b / 25%));
+   --axo-color-label-safety:               light-dark(#b94b29, #eb977d);
+   --axo-color-label-safety-disabled:      light-dark(--alpha(#b94b29 / 25%), --alpha(#eb977d / 25%));
+-  --axo-color-label-destructive:          light-dark(#f21602, #ff4a3a);
+-  --axo-color-label-destructive-disabled: light-dark(--alpha(#f21602 / 25%), --alpha(#ff4a3a / 25%));
++  --axo-color-label-destructive:          light-dark(#e00052, #fe006e);
++  --axo-color-label-destructive-disabled: light-dark(--alpha(#e00052 / 25%), --alpha(#fe006e / 25%));
+ }
+ 
+ /* prettier-ignore */
+ @layer theme {
+   @media (prefers-contrast: more) {
+     :root {
+-      --axo-color-label-accent:               light-dark(#000cf3, #b6bcff);
+-      --axo-color-label-accent-disabled:      light-dark(--alpha(#000cf3 / 40%), --alpha(#b6bcff / 40%));
++      --axo-color-label-accent:               light-dark(#3e24b4, #c8bdff);
++      --axo-color-label-accent-disabled:      light-dark(--alpha(#3e24b4 / 40%), --alpha(#c8bdff / 40%));
+       --axo-color-label-affirmative:          light-dark(#005b0c, #10f53e);
+       --axo-color-label-affirmative-disabled: light-dark(--alpha(#005b0c / 40%), --alpha(#10f53e / 40%));
+       --axo-color-label-warning:              light-dark(#332900, #ffde5b);
+       --axo-color-label-warning-disabled:     light-dark(--alpha(#332900 / 40%), --alpha(#ffde5b / 40%));
+       --axo-color-label-safety:               light-dark(#932200, #ffa88d);
+       --axo-color-label-safety-disabled:      light-dark(--alpha(#932200 / 40%), --alpha(#ffa88d / 40%));
+-      --axo-color-label-destructive:          light-dark(#a20d00, #ff9e99);
+-      --axo-color-label-destructive-disabled: light-dark(--alpha(#a20d00 / 40%), --alpha(#ff9e99 / 40%));
++      --axo-color-label-destructive:          light-dark(#a0003b, #ff8daf);
++      --axo-color-label-destructive-disabled: light-dark(--alpha(#a0003b / 40%), --alpha(#ff8daf / 40%));
+     }
+   }
+ }
+@@ -184,26 +184,26 @@
+ 
+ /* prettier-ignore */
+ @theme {
+-  --axo-color-surface-primary:          light-dark(#fafafa, #191919);
+-  --axo-color-surface-secondary:        light-dark(#f5f5f5, #1e1e1e);
+-  --axo-color-surface-tertiary:         light-dark(#f0f0f0, #282828);
+-  --axo-color-surface-quaternary:       light-dark(#e6e6e6, #373737);
+-  --axo-color-surface-card:             light-dark(#ffffff, --alpha(#969696 / 8%));
+-  --axo-color-surface-message-incoming: light-dark(#ebebeb, #323232);
+-  --axo-color-surface-message-outgoing: light-dark(#2267f5, #2267f5);
++  --axo-color-surface-primary:          light-dark(#f6f6ff, #100e1f);
++  --axo-color-surface-secondary:        light-dark(#f3f0ff, #181137);
++  --axo-color-surface-tertiary:         light-dark(#eeeaff, #1e1645);
++  --axo-color-surface-quaternary:       light-dark(#eae5ff, #231a4e);
++  --axo-color-surface-card:             light-dark(#ffffff, #281e57);
++  --axo-color-surface-message-incoming: light-dark(#eeeaff, #281e57);
++  --axo-color-surface-message-outgoing: light-dark(#7152ff, #5335dd);
+ }
+ 
+ /* prettier-ignore */
+ @layer theme {
+   @media (prefers-contrast: more) {
+     :root {
+-      --axo-color-surface-primary:          light-dark(#fafafa, #191919);
+-      --axo-color-surface-secondary:        light-dark(#f5f5f5, #1e1e1e);
+-      --axo-color-surface-tertiary:         light-dark(#f0f0f0, #282828);
+-      --axo-color-surface-quaternary:       light-dark(#e6e6e6, #373737);
+-      --axo-color-surface-card:             light-dark(#ffffff, --alpha(#969696 / 8%));
+-      --axo-color-surface-message-incoming: light-dark(#e1e1e1, #3c3c3c);
+-      --axo-color-surface-message-outgoing: light-dark(#0842b9, #0842b9);
++      --axo-color-surface-primary:          light-dark(#f6f6ff, #100e1f);
++      --axo-color-surface-secondary:        light-dark(#f3f0ff, #181137);
++      --axo-color-surface-tertiary:         light-dark(#eeeaff, #1e1645);
++      --axo-color-surface-quaternary:       light-dark(#e5dfff, #281e57);
++      --axo-color-surface-card:             light-dark(#ffffff, #281e57);
++      --axo-color-surface-message-incoming: light-dark(#e5dfff, #281e57);
++      --axo-color-surface-message-outgoing: light-dark(#5335dd, #5335dd);
+     }
+   }
+ }
+@@ -220,15 +220,15 @@
+ 
+ /* prettier-ignore */
+ @theme {
+-  --axo-color-material-primary:            light-dark(--alpha(#fafafa / 90%), --alpha(#191919 / 90%));
+-  --axo-color-material-secondary:          light-dark(--alpha(#f4f4f4 / 90%), --alpha(#1f1f1f / 90%));
+-  --axo-color-material-tertiary:           light-dark(--alpha(#efefef / 90%), --alpha(#2a2a2a / 90%));
+-  --axo-color-material-tertiary-pressed:   light-dark(--alpha(#e9e9e9 / 90%), --alpha(#2f2f2f / 90%));
+-  --axo-color-material-quaternary:         light-dark(--alpha(#e4e4e4 / 90%), --alpha(#353535 / 90%));
+-  --axo-color-material-quaternary-pressed: light-dark(--alpha(#dedede / 90%), --alpha(#3a3a3a / 90%));
++  --axo-color-material-primary:            light-dark(--alpha(#f6f6ff / 90%), --alpha(#100e1f / 90%));
++  --axo-color-material-secondary:          light-dark(--alpha(#f3f0ff / 90%), --alpha(#181137 / 90%));
++  --axo-color-material-tertiary:           light-dark(--alpha(#eeeaff / 90%), --alpha(#1e1645 / 90%));
++  --axo-color-material-tertiary-pressed:   light-dark(--alpha(#eae5ff / 90%), --alpha(#231a4e / 90%));
++  --axo-color-material-quaternary:         light-dark(--alpha(#e5dfff / 90%), --alpha(#281e57 / 90%));
++  --axo-color-material-quaternary-pressed: light-dark(--alpha(#ddd5ff / 90%), --alpha(#302461 / 90%));
+   --axo-color-material-dim-primary:        light-dark(--alpha(#383838 / 90%), --alpha(#515151 / 90%));
+   --axo-color-material-dim-secondary:      light-dark(--alpha(#646464 / 90%), --alpha(#454545 / 90%));
+-  --axo-color-material-dialog:             light-dark(--alpha(#fafafa / 90%), --alpha(#353535 / 90%));
++  --axo-color-material-dialog:             light-dark(--alpha(#f6f6ff / 90%), --alpha(#281e57 / 90%));
+   --axo-color-material-warning:            light-dark(--alpha(#fff7d6 / 80%), --alpha(#49442f / 80%));
+ }
+ 
+@@ -236,15 +236,15 @@
+ @layer theme {
+   @media (prefers-contrast: more) {
+     :root {
+-      --axo-color-material-primary:            light-dark(#fafafa, #191919);
+-      --axo-color-material-secondary:          light-dark(#f5f5f5, #1e1e1e);
+-      --axo-color-material-tertiary:           light-dark(#f0f0f0, #282828);
+-      --axo-color-material-tertiary-pressed:   light-dark(#ebebeb, #2d2d2d);
+-      --axo-color-material-quaternary:         light-dark(#e6e6e6, #323232);
+-      --axo-color-material-quaternary-pressed: light-dark(#e1e1e1, #373737);
++      --axo-color-material-primary:            light-dark(#f6f6ff, #100e1f);
++      --axo-color-material-secondary:          light-dark(#f3f0ff, #181137);
++      --axo-color-material-tertiary:           light-dark(#eeeaff, #1e1645);
++      --axo-color-material-tertiary-pressed:   light-dark(#eae5ff, #231a4e);
++      --axo-color-material-quaternary:         light-dark(#e5dfff, #281e57);
++      --axo-color-material-quaternary-pressed: light-dark(#ddd5ff, #302461);
+       --axo-color-material-dim-primary:        light-dark(#4b4b4b, #4b4b4b);
+       --axo-color-material-dim-secondary:      light-dark(#737373, #414141);
+-      --axo-color-material-dialog:             light-dark(#fafafa, #323232);
++      --axo-color-material-dialog:             light-dark(#f6f6ff, #281e57);
+       --axo-color-material-warning:            light-dark(#fff9e0, #443f2c);
+     }
+   }
+@@ -339,12 +339,12 @@
+ 
+ /* prettier-ignore */
+ @theme {
+-  --axo-color-fill-accent:                     light-dark(#4655ff, #5563ff);
+-  --axo-color-fill-accent-pressed:             light-dark(#3b4af4, #616eff);
+-  --axo-color-fill-accent-bright:              light-dark(#b2b9ff, #b2b9ff);
+-  --axo-color-fill-accent-bright-pressed:      light-dark(#a8b0ff, #a8b0ff);
+-  --axo-color-fill-accent-tint:                light-dark(--alpha(#030ffc / 6%), --alpha(#99a1ff / 12%));
+-  --axo-color-fill-accent-tint-pressed:        light-dark(--alpha(#030ffc / 10%), --alpha(#99a1ff / 16%));
++  --axo-color-fill-accent:                     light-dark(#7152ff, #7152ff);
++  --axo-color-fill-accent-pressed:             light-dark(#6545f0, #8064ff);
++  --axo-color-fill-accent-bright:              light-dark(#c8bdff, #c8bdff);
++  --axo-color-fill-accent-bright-pressed:      light-dark(#b9abff, #b9abff);
++  --axo-color-fill-accent-tint:                light-dark(--alpha(#5335dd / 6%), --alpha(#aa98ff / 12%));
++  --axo-color-fill-accent-tint-pressed:        light-dark(--alpha(#5335dd / 10%), --alpha(#aa98ff / 16%));
+ 
+   --axo-color-fill-affirmative:                light-dark(#09a523, #07ab23);
+   --axo-color-fill-affirmative-pressed:        light-dark(#089b21, #08b525);
+@@ -363,10 +363,10 @@
+   --axo-color-fill-safety-tint:                light-dark(--alpha(#b95929 / 12%), --alpha(#eb977d / 16%));
+   --axo-color-fill-safety-tint-pressed:        light-dark(--alpha(#b95929 / 16%), --alpha(#eb977d / 20%));
+ 
+-  --axo-color-fill-destructive:                light-dark(#f21c0d, #ee382c);
+-  --axo-color-fill-destructive-pressed:        light-dark(#e41a0c, #ef493e);
+-  --axo-color-fill-destructive-tint:           light-dark(--alpha(#f21602 / 6%), --alpha(#ff4a3a / 12%));
+-  --axo-color-fill-destructive-tint-pressed:   light-dark(--alpha(#f21602 / 10%), --alpha(#ff4a3a / 16%));
++  --axo-color-fill-destructive:                light-dark(#e00052, #fe006e);
++  --axo-color-fill-destructive-pressed:        light-dark(#c90049, #e90065);
++  --axo-color-fill-destructive-tint:           light-dark(--alpha(#e00052 / 6%), --alpha(#fe006e / 12%));
++  --axo-color-fill-destructive-tint-pressed:   light-dark(--alpha(#e00052 / 10%), --alpha(#fe006e / 16%));
+ 
+   --axo-color-fill-white:                      light-dark(#ffffff, #ffffff);
+   --axo-color-fill-white-pressed:              light-dark(#fafafa, #fafafa);
+@@ -376,12 +376,12 @@
+ @layer theme {
+   @media (prefers-contrast: more) {
+     :root {
+-      --axo-color-fill-accent:                     light-dark(#1f31ff, #2536f9);
+-      --axo-color-fill-accent-pressed:             light-dark(#0519ff, #2e3ffa);
+-      --axo-color-fill-accent-bright:              light-dark(#b2b9ff, #b2b9ff);
+-      --axo-color-fill-accent-bright-pressed:      light-dark(#a8b0ff, #a8b0ff);
+-      --axo-color-fill-accent-tint:                light-dark(--alpha(#030ffc / 10%), --alpha(#99a1ff / 18%));
+-      --axo-color-fill-accent-tint-pressed:        light-dark(--alpha(#030ffc / 14%), --alpha(#99a1ff / 22%));
++      --axo-color-fill-accent:                     light-dark(#5335dd, #aa98ff);
++      --axo-color-fill-accent-pressed:             light-dark(#3e24b4, #b9abff);
++      --axo-color-fill-accent-bright:              light-dark(#c8bdff, #c8bdff);
++      --axo-color-fill-accent-bright-pressed:      light-dark(#b9abff, #b9abff);
++      --axo-color-fill-accent-tint:                light-dark(--alpha(#5335dd / 10%), --alpha(#aa98ff / 18%));
++      --axo-color-fill-accent-tint-pressed:        light-dark(--alpha(#5335dd / 14%), --alpha(#aa98ff / 22%));
+ 
+       --axo-color-fill-affirmative:                light-dark(#007514, #007514);
+       --axo-color-fill-affirmative-pressed:        light-dark(#006b12, #008016);
+@@ -400,10 +400,10 @@
+       --axo-color-fill-safety-tint:                light-dark(--alpha(#b95929 / 12%), --alpha(#eb977d / 16%));
+       --axo-color-fill-safety-tint-pressed:        light-dark(--alpha(#b95929 / 16%), --alpha(#eb977d / 20%));
+ 
+-      --axo-color-fill-destructive:                light-dark(#b80c00, #b80c00);
+-      --axo-color-fill-destructive-pressed:        light-dark(#a80b00, #c20d00);
+-      --axo-color-fill-destructive-tint:           light-dark(--alpha(#d91304 / 12%), --alpha(#ff4a3a / 20%));
+-      --axo-color-fill-destructive-tint-pressed:   light-dark(--alpha(#d91304 / 16%), --alpha(#ff4a3a / 24%));
++      --axo-color-fill-destructive:                light-dark(#a0003b, #fe006e);
++      --axo-color-fill-destructive-pressed:        light-dark(#890033, #e90065);
++      --axo-color-fill-destructive-tint:           light-dark(--alpha(#e00052 / 12%), --alpha(#fe006e / 20%));
++      --axo-color-fill-destructive-tint-pressed:   light-dark(--alpha(#e00052 / 16%), --alpha(#fe006e / 24%));
+ 
+       --axo-color-fill-white:                      light-dark(#ffffff, #ffffff);
+       --axo-color-fill-white-pressed:              light-dark(#fafafa, #fafafa);
+@@ -467,7 +467,7 @@
+   --axo-color-border-primary:               light-dark(--alpha(#000000 / 6%), --alpha(#ffffff / 6%));
+   --axo-color-border-secondary:             light-dark(--alpha(#000000 / 10%), --alpha(#ffffff / 10%));
+   --axo-color-border-tertiary:              light-dark(--alpha(#000000 / 24%), --alpha(#ffffff / 24%));
+-  --axo-color-border-selected:              light-dark(#4655ff, #c9ceff);
++  --axo-color-border-selected:              light-dark(#7152ff, #c8bdff);
+   --axo-color-border-selected-oncolor:      light-dark(#fafafa, #fafafa);
+   --axo-color-border-focused-inner:         light-dark(#ffffff, #000000);
+   --axo-color-border-focused-outer:         light-dark(#808190, #c9cbda);
+@@ -482,7 +482,7 @@
+       --axo-color-border-primary:               light-dark(--alpha(#000000 / 24%), --alpha(#ffffff / 24%));
+       --axo-color-border-secondary:             light-dark(--alpha(#000000 / 32%), --alpha(#ffffff / 32%));
+       --axo-color-border-tertiary:              light-dark(--alpha(#000000 / 70%), --alpha(#ffffff / 70%));
+-      --axo-color-border-selected:              light-dark(#3243ff, #c9ceff);
++      --axo-color-border-selected:              light-dark(#5335dd, #c8bdff);
+       --axo-color-border-selected-oncolor:      light-dark(#fafafa, #fafafa);
+       --axo-color-border-focused-inner:         light-dark(#ffffff, #000000);
+       --axo-color-border-focused-outer:         light-dark(#67697e, #e4e5f0);

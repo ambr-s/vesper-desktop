@@ -1,0 +1,38 @@
+From dc2c4f3ca65e8b39e2d4c44439c93866eb949e8d Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sat, 25 Jul 2026 19:28:50 +0100
+Subject: [PATCH 7/7] Record Molly provenance in adapted settings
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Name the Molly commits behind Vesper’s optional logging controls at the relevant source locations.
+---
+ ts/components/Preferences.dom.tsx | 1 +
+ ts/logging/log.std.ts             | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/ts/components/Preferences.dom.tsx b/ts/components/Preferences.dom.tsx
+index dc692fca7..85a467ba7 100644
+--- a/ts/components/Preferences.dom.tsx
++++ b/ts/components/Preferences.dom.tsx
+@@ -1899,6 +1899,7 @@ export function Preferences({
+             </AxoConfirmDialog.Action>
+           </AxoConfirmDialog.Root>
+         ) : null}
++        {/* Vesper's logging controls follow Molly commits 794df8f8 and d6cc48d6. */}
+         <SettingsRow title={i18n('icu:Vesper__Settings__Section')}>
+           <Checkbox
+             checked={hasDebugLogging}
+diff --git a/ts/logging/log.std.ts b/ts/logging/log.std.ts
+index e26a3ea4e..f13b4cf2b 100644
+--- a/ts/logging/log.std.ts
++++ b/ts/logging/log.std.ts
+@@ -16,6 +16,7 @@ let redactAll = (value: string) => value;
+ 
+ let destination: pino.DestinationStream | undefined;
+ let buffer = new Array<string>();
++// Vesper's opt-in logging behaviour follows Molly commit 794df8f8a328d20d6915e8685e0ddfe55757a1df.
+ let loggingEnabled = false;
+ 
+ export function setLoggingEnabled(enabled: boolean): void {

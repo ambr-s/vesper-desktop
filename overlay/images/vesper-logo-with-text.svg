@@ -1,0 +1,26 @@
+<!--
+  Copyright 2026 Vesper contributors
+  SPDX-License-Identifier: AGPL-3.0-only
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="160" viewBox="0 0 560 160">
+  <g transform="translate(16 8)">
+    <path
+      d="M25 31 72 123 119 31"
+      fill="none"
+      stroke="#7152FF"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="19"
+    />
+    <path d="m116 7 5 13 13 5-13 5-5 13-5-13-13-5 13-5 5-13Z" fill="#7152FF"/>
+  </g>
+  <text
+    x="172"
+    y="115"
+    fill="#7152FF"
+    font-family="Inter, sans-serif"
+    font-size="94"
+    font-weight="700"
+    letter-spacing="-4"
+  >Vesper</text>
+</svg>

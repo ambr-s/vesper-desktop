@@ -1,0 +1,521 @@
+From 940bfc8d61d6aab30a65cc17f3de2ca741f2460c Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sat, 25 Jul 2026 18:54:15 +0100
+Subject: [PATCH 3/7] Preserve messages after remote deletion requests
+
+Add an opt-in privacy setting that keeps ordinary incoming chat messages when their sender deletes them for everyone. Administrator deletions, stories, and our own outgoing messages continue to use Signal's standard deletion path.
+
+Kept messages receive a local-only Deletion requested marker. The marker is deliberately outside Signal's backup schema.
+---
+ .oxlint/rules/enforceLicenseComments.mjs      |  6 +-
+ _locales/en/messages.json                     | 24 ++++++++
+ stylesheets/_modules.scss                     |  9 +++
+ ts/components/Preferences.dom.stories.tsx     |  2 +
+ ts/components/Preferences.dom.tsx             | 42 +++++++++++++
+ ts/components/conversation/Message.dom.tsx    | 16 ++++-
+ .../TimelineMessage.dom.stories.tsx           | 12 ++++
+ ts/model-types.d.ts                           |  1 +
+ ts/state/selectors/message.preload.ts         |  1 +
+ ts/state/smart/Preferences.preload.tsx        |  4 ++
+ .../util/vesperDeleteForEveryone_test.std.ts  | 60 +++++++++++++++++++
+ ts/types/Message.std.ts                       |  1 +
+ ts/types/StorageKeys.std.ts                   |  2 +
+ ts/util/deleteForEveryone.preload.ts          | 30 ++++++++--
+ ts/util/vesperDeleteForEveryone.std.ts        | 16 +++++
+ 15 files changed, 217 insertions(+), 9 deletions(-)
+ create mode 100644 ts/test-node/util/vesperDeleteForEveryone_test.std.ts
+ create mode 100644 ts/util/vesperDeleteForEveryone.std.ts
+
+diff --git a/.oxlint/rules/enforceLicenseComments.mjs b/.oxlint/rules/enforceLicenseComments.mjs
+index e61ad55f4..f7a33a7f6 100644
+--- a/.oxlint/rules/enforceLicenseComments.mjs
++++ b/.oxlint/rules/enforceLicenseComments.mjs
+@@ -3,10 +3,12 @@
+ // @ts-check
+ import { ESLintUtils } from '@typescript-eslint/utils';
+ 
+-const COMMENT_LINE_1_EXACT = /^ Copyright \d{4} Signal Messenger, LLC$/;
++const COMMENT_LINE_1_EXACT =
++  /^ Copyright \d{4} (?:Signal Messenger, LLC|amber)$/;
+ const COMMENT_LINE_2_EXACT = /^ SPDX-License-Identifier: AGPL-3.0-only$/;
+ 
+-const COMMENT_LINE_1_LOOSE = /Copyright (\d{4}) Signal Messenger, LLC/;
++const COMMENT_LINE_1_LOOSE =
++  /Copyright (\d{4}) (?:Signal Messenger, LLC|amber)/;
+ const COMMENT_LINE_2_LOOSE = /SPDX-License-Identifier: AGPL-3.0-only/;
+ 
+ export const enforceLicenseComments = ESLintUtils.RuleCreator.withoutDocs({
+diff --git a/_locales/en/messages.json b/_locales/en/messages.json
+index 16ae2fc30..626b0e50b 100644
+--- a/_locales/en/messages.json
++++ b/_locales/en/messages.json
+@@ -8916,6 +8916,30 @@
+     "messageformat": "Turn off and delete",
+     "description": "Action in the diagnostic logging disable confirmation"
+   },
++  "icu:Vesper__Settings__KeepDeletedMessages__Label": {
++    "messageformat": "Keep deleted messages",
++    "description": "Label of the keep deleted messages checkbox in Settings > Privacy > Vesper"
++  },
++  "icu:Vesper__Settings__KeepDeletedMessages__Description": {
++    "messageformat": "Keep messages when someone deletes them for everyone. Vesper marks them as “Deletion requested”.",
++    "description": "Description of the keep deleted messages checkbox in Settings > Privacy > Vesper"
++  },
++  "icu:Vesper__Settings__KeepDeletedMessages__EnableDialog__Title": {
++    "messageformat": "Keep messages after deletion requests?",
++    "description": "Title of the keep deleted messages enable confirmation"
++  },
++  "icu:Vesper__Settings__KeepDeletedMessages__EnableDialog__Description": {
++    "messageformat": "Deleted messages can contain abuse or other content the sender meant to remove. Keeping them may affect other people’s privacy. Only turn this on if you understand that risk.",
++    "description": "Description of the keep deleted messages enable confirmation"
++  },
++  "icu:Vesper__Settings__KeepDeletedMessages__EnableDialog__Action": {
++    "messageformat": "Keep deleted messages",
++    "description": "Action in the keep deleted messages enable confirmation"
++  },
++  "icu:Vesper__Message__DeletionRequested": {
++    "messageformat": "Deletion requested",
++    "description": "Local-only label shown on a message that Vesper kept after a remote deletion request"
++  },
+   "icu:DialogUpdate--version-available": {
+     "messageformat": "Update to version {version} available",
+     "description": "Tooltip for new update available"
+diff --git a/stylesheets/_modules.scss b/stylesheets/_modules.scss
+index 6130993c2..a3ae2797e 100644
+--- a/stylesheets/_modules.scss
++++ b/stylesheets/_modules.scss
+@@ -1156,6 +1156,15 @@ $message-padding-horizontal: 12px;
+   color: light-dark(variables.$color-gray-60, variables.$color-gray-25);
+ }
+ 
++.module-message__deletion-requested {
++  @include mixins.font-caption;
++
++  display: block;
++  margin-top: 4px;
++  user-select: none;
++  color: var(--axo-color-label-destructive);
++}
++
+ .module-message__metadata {
+   @include mixins.font-caption;
+ 
+diff --git a/ts/components/Preferences.dom.stories.tsx b/ts/components/Preferences.dom.stories.tsx
+index 7fe5da66f..9038f7773 100644
+--- a/ts/components/Preferences.dom.stories.tsx
++++ b/ts/components/Preferences.dom.stories.tsx
+@@ -469,6 +469,7 @@ export default {
+     hasCallRingtoneNotification: false,
+     hasContentProtection: false,
+     hasDebugLogging: false,
++    hasKeepDeletedMessages: false,
+     hasCountMutedConversations: false,
+     hasFailedStorySends: false,
+     hasHideMenuBar: false,
+@@ -598,6 +599,7 @@ export default {
+     ),
+     onContentProtectionChange: action('onContentProtectionChange'),
+     onDebugLoggingChange: action('onDebugLoggingChange'),
++    onKeepDeletedMessagesChange: action('onKeepDeletedMessagesChange'),
+     onCountMutedConversationsChange: action('onCountMutedConversationsChange'),
+     onEmojiSkinToneDefaultChange: action('onEmojiSkinToneDefaultChange'),
+     onHasKeyTransparencyDisabledChanged: action(
+diff --git a/ts/components/Preferences.dom.tsx b/ts/components/Preferences.dom.tsx
+index bd14797b7..51ec201db 100644
+--- a/ts/components/Preferences.dom.tsx
++++ b/ts/components/Preferences.dom.tsx
+@@ -142,6 +142,7 @@ export type PropsDataType = {
+   hasCallRingtoneNotification: boolean;
+   hasContentProtection: boolean | undefined;
+   hasDebugLogging: boolean | undefined;
++  hasKeepDeletedMessages: boolean;
+   hasCountMutedConversations: boolean;
+   hasHideMenuBar?: boolean;
+   hasIncomingCallNotifications: boolean;
+@@ -324,6 +325,7 @@ type PropsFunctionType = {
+   onCallRingtoneNotificationChange: CheckboxChangeHandlerType;
+   onContentProtectionChange: CheckboxChangeHandlerType;
+   onDebugLoggingChange: CheckboxChangeHandlerType;
++  onKeepDeletedMessagesChange: CheckboxChangeHandlerType;
+   onCountMutedConversationsChange: CheckboxChangeHandlerType;
+   onEmojiSkinToneDefaultChange: (emojiSkinTone: Emoji.SkinTone) => void;
+   onHasKeyTransparencyDisabledChanged: SelectChangeHandlerType<boolean>;
+@@ -453,6 +455,7 @@ export function Preferences({
+   hasCallRingtoneNotification,
+   hasContentProtection,
+   hasDebugLogging,
++  hasKeepDeletedMessages,
+   hasCountMutedConversations,
+   hasFailedStorySends,
+   hasHideMenuBar,
+@@ -506,6 +509,7 @@ export function Preferences({
+   onCallRingtoneNotificationChange,
+   onContentProtectionChange,
+   onDebugLoggingChange,
++  onKeepDeletedMessagesChange,
+   onCountMutedConversationsChange,
+   onEmojiSkinToneDefaultChange,
+   onHasKeyTransparencyDisabledChanged,
+@@ -620,6 +624,8 @@ export function Preferences({
+   const [confirmContentProtection, setConfirmContentProtection] =
+     useState(false);
+   const [confirmDebugLoggingOff, setConfirmDebugLoggingOff] = useState(false);
++  const [confirmKeepDeletedMessages, setConfirmKeepDeletedMessages] =
++    useState(false);
+   const [showSyncFailed, setShowSyncFailed] = useState(false);
+   const [nowSyncing, setNowSyncing] = useState(false);
+   const [showDisappearingTimerDialog, setShowDisappearingTimerDialog] =
+@@ -1886,6 +1892,22 @@ export function Preferences({
+               }
+             }}
+           />
++          <Checkbox
++            checked={hasKeepDeletedMessages}
++            description={i18n(
++              'icu:Vesper__Settings__KeepDeletedMessages__Description'
++            )}
++            label={i18n('icu:Vesper__Settings__KeepDeletedMessages__Label')}
++            moduleClassName="Preferences__checkbox"
++            name="keepDeletedMessages"
++            onChange={value => {
++              if (value) {
++                setConfirmKeepDeletedMessages(true);
++              } else {
++                onKeepDeletedMessagesChange(false);
++              }
++            }}
++          />
+         </SettingsRow>
+         <AxoConfirmDialog.Root
+           open={confirmDebugLoggingOff}
+@@ -1905,6 +1927,26 @@ export function Preferences({
+             {i18n('icu:Vesper__Settings__DebugLogging__DisableDialog__Action')}
+           </AxoConfirmDialog.Action>
+         </AxoConfirmDialog.Root>
++        <AxoConfirmDialog.Root
++          open={confirmKeepDeletedMessages}
++          onOpenChange={setConfirmKeepDeletedMessages}
++          title={i18n(
++            'icu:Vesper__Settings__KeepDeletedMessages__EnableDialog__Title'
++          )}
++          description={i18n(
++            'icu:Vesper__Settings__KeepDeletedMessages__EnableDialog__Description'
++          )}
++        >
++          <AxoConfirmDialog.Cancel />
++          <AxoConfirmDialog.Action
++            variant="strong-primary"
++            onClick={() => onKeepDeletedMessagesChange(true)}
++          >
++            {i18n(
++              'icu:Vesper__Settings__KeepDeletedMessages__EnableDialog__Action'
++            )}
++          </AxoConfirmDialog.Action>
++        </AxoConfirmDialog.Root>
+         <SettingsRow title={i18n('icu:Stories__title')}>
+           <FlowingControl>
+             <div className="Preferences__two-thirds-flow">
+diff --git a/ts/components/conversation/Message.dom.tsx b/ts/components/conversation/Message.dom.tsx
+index 4a080a725..e5965b116 100644
+--- a/ts/components/conversation/Message.dom.tsx
++++ b/ts/components/conversation/Message.dom.tsx
+@@ -307,6 +307,7 @@ export type PropsData = {
+   reactions?: ReactionViewerProps['reactions'];
+ 
+   deletedForEveryone?: boolean;
++  vesperDeletionRequested?: boolean;
+   deletedForEveryoneByAdmin?: {
+     conversationId: string;
+     title: string;
+@@ -2455,13 +2456,17 @@ export class Message extends PureComponent<Props, State> {
+       showConversation,
+       showSpoiler,
+       status,
+-
+       textAttachment,
++      vesperDeletionRequested,
+     } = this.props;
+     const { metadataWidth } = this.state;
+ 
+     const messageStatusContents = this.#getMessageStatusContents();
+-    if (messageStatusContents == null && text == null) {
++    if (
++      messageStatusContents == null &&
++      text == null &&
++      !vesperDeletionRequested
++    ) {
+       return null;
+     }
+ 
+@@ -2530,6 +2535,13 @@ export class Message extends PureComponent<Props, State> {
+             textAttachment={textAttachment}
+           />
+         )}
++        {vesperDeletionRequested && (
++          <span className="module-message__deletion-requested" dir="auto">
++            <AxoSymbol.InlineGlyph symbol="trash" label={null} />
++            &nbsp;
++            {i18n('icu:Vesper__Message__DeletionRequested')}
++          </span>
++        )}
+         {this.#getMetadataPlacement() === MetadataPlacement.InlineWithText && (
+           <MessageTextMetadataSpacer metadataWidth={metadataWidth} />
+         )}
+diff --git a/ts/components/conversation/TimelineMessage.dom.stories.tsx b/ts/components/conversation/TimelineMessage.dom.stories.tsx
+index 005a3f58e..71c478056 100644
+--- a/ts/components/conversation/TimelineMessage.dom.stories.tsx
++++ b/ts/components/conversation/TimelineMessage.dom.stories.tsx
+@@ -261,6 +261,7 @@ const createProps = (overrideProps: Partial<Props> = {}): Props => ({
+   contactLabel: overrideProps.contactLabel,
+   // disableMenu: overrideProps.disableMenu,
+   deletedForEveryone: overrideProps.deletedForEveryone,
++  vesperDeletionRequested: overrideProps.vesperDeletionRequested,
+   deletedForEveryoneByAdmin: overrideProps.deletedForEveryoneByAdmin,
+   disableScroll: overrideProps.disableScroll,
+   direction: overrideProps.direction || 'incoming',
+@@ -946,6 +947,17 @@ export function Deleted(): JSX.Element {
+   );
+ }
+ 
++export function DeletionRequested(): JSX.Element {
++  const props = createProps({
++    conversationType: 'direct',
++    direction: 'incoming',
++    text: 'This message remains on this device.',
++    vesperDeletionRequested: true,
++  });
++
++  return <>{renderThree(props)}</>;
++}
++
+ export function DeletedByAdmin(): JSX.Element {
+   const props = createProps({
+     conversationType: 'group',
+diff --git a/ts/model-types.d.ts b/ts/model-types.d.ts
+index e90ad8d11..b32787843 100644
+--- a/ts/model-types.d.ts
++++ b/ts/model-types.d.ts
+@@ -199,6 +199,7 @@ export type MessageAttributesType = {
+   deletedForEveryone?: boolean;
+   deletedForEveryoneByAdminAci?: AciString;
+   deletedForEveryoneTimestamp?: number;
++  vesperDeletionRequested?: boolean;
+   errors?: ReadonlyArray<CustomError> | null;
+   expirationStartTimestamp?: number | null;
+   expireTimer?: DurationInSeconds;
+diff --git a/ts/state/selectors/message.preload.ts b/ts/state/selectors/message.preload.ts
+index f51e139af..796b2c432 100644
+--- a/ts/state/selectors/message.preload.ts
++++ b/ts/state/selectors/message.preload.ts
+@@ -1001,6 +1001,7 @@ const getPropsForMessage = (
+     conversationType: isGroup ? 'group' : 'direct',
+     customColor,
+     deletedForEveryone: message.deletedForEveryone || false,
++    vesperDeletionRequested: message.vesperDeletionRequested || false,
+     deletedForEveryoneByAdmin: getDeletedForEveryoneByAdmin(message, {
+       conversationSelector,
+       contactNameColors,
+diff --git a/ts/state/smart/Preferences.preload.tsx b/ts/state/smart/Preferences.preload.tsx
+index 35fbe8b93..a35f12655 100644
+--- a/ts/state/smart/Preferences.preload.tsx
++++ b/ts/state/smart/Preferences.preload.tsx
+@@ -729,6 +729,8 @@ export function SmartPreferences(): JSX.Element | null {
+       const account = window.ConversationController.getOurConversationOrThrow();
+       account.captureChange('keepMutedChatsArchived');
+     });
++  const [hasKeepDeletedMessages, onKeepDeletedMessagesChange] =
++    createItemsAccess('vesperKeepDeletedMessages', false);
+   const [hasAutoDownloadUpdate, onAutoDownloadUpdateChange] = createItemsAccess(
+     'auto-download-update',
+     true
+@@ -955,6 +957,7 @@ export function SmartPreferences(): JSX.Element | null {
+         hasAutoDownloadUpdate={hasAutoDownloadUpdate}
+         hasAutoLaunch={hasAutoLaunch}
+         hasKeepMutedChatsArchived={hasKeepMutedChatsArchived}
++        hasKeepDeletedMessages={hasKeepDeletedMessages}
+         hasCallNotifications={hasCallNotifications}
+         hasCallRingtoneNotification={hasCallRingtoneNotification}
+         hasContentProtection={hasContentProtection}
+@@ -1023,6 +1026,7 @@ export function SmartPreferences(): JSX.Element | null {
+         onHideMenuBarChange={onHideMenuBarChange}
+         onIncomingCallNotificationsChange={onIncomingCallNotificationsChange}
+         onKeepMutedChatsArchivedChange={onKeepMutedChatsArchivedChange}
++        onKeepDeletedMessagesChange={onKeepDeletedMessagesChange}
+         onLastSyncTimeChange={onLastSyncTimeChange}
+         onLinkPreviewsChange={onLinkPreviewsChange}
+         onLocaleChange={onLocaleChange}
+diff --git a/ts/test-node/util/vesperDeleteForEveryone_test.std.ts b/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
+new file mode 100644
+index 000000000..22a6bea4f
+--- /dev/null
++++ b/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
+@@ -0,0 +1,60 @@
++// Copyright 2026 amber
++// SPDX-License-Identifier: AGPL-3.0-only
++
++import { assert } from 'chai';
++
++import { shouldKeepDeletedMessage } from '../../util/vesperDeleteForEveryone.std.ts';
++
++describe('shouldKeepDeletedMessage', () => {
++  it('keeps an incoming participant deletion when the setting is on', () => {
++    assert.isTrue(
++      shouldKeepDeletedMessage({
++        isAdminDelete: false,
++        isIncoming: true,
++        isStory: false,
++        keepDeletedMessages: true,
++      })
++    );
++  });
++
++  it('uses the standard deletion path when the setting is off', () => {
++    assert.isFalse(
++      shouldKeepDeletedMessage({
++        isAdminDelete: false,
++        isIncoming: true,
++        isStory: false,
++        keepDeletedMessages: false,
++      })
++    );
++  });
++
++  it('never keeps our own outgoing message', () => {
++    assert.isFalse(
++      shouldKeepDeletedMessage({
++        isAdminDelete: false,
++        isIncoming: false,
++        isStory: false,
++        keepDeletedMessages: true,
++      })
++    );
++  });
++
++  it('never keeps an administrator deletion or a story', () => {
++    assert.isFalse(
++      shouldKeepDeletedMessage({
++        isAdminDelete: true,
++        isIncoming: true,
++        isStory: false,
++        keepDeletedMessages: true,
++      })
++    );
++    assert.isFalse(
++      shouldKeepDeletedMessage({
++        isAdminDelete: false,
++        isIncoming: true,
++        isStory: true,
++        keepDeletedMessages: true,
++      })
++    );
++  });
++});
+diff --git a/ts/types/Message.std.ts b/ts/types/Message.std.ts
+index ee68fd28d..5e3a44298 100644
+--- a/ts/types/Message.std.ts
++++ b/ts/types/Message.std.ts
+@@ -42,6 +42,7 @@ const messageAttributesEraseBehavior: Record<
+   deletedForEveryoneFailed: 'preserve',
+   deletedForEveryoneSendStatus: 'preserve',
+   deletedForEveryoneTimestamp: 'preserve',
++  vesperDeletionRequested: 'preserve',
+   editMessageReceivedAt: 'preserve',
+   editMessageReceivedAtMs: 'preserve',
+   editMessageTimestamp: 'preserve',
+diff --git a/ts/types/StorageKeys.std.ts b/ts/types/StorageKeys.std.ts
+index 8a1647886..cf13ce739 100644
+--- a/ts/types/StorageKeys.std.ts
++++ b/ts/types/StorageKeys.std.ts
+@@ -199,6 +199,7 @@ export type StorageAccessType = {
+   backupsSubscriberOriginalTransactionId: string;
+   displayBadgesOnProfile: boolean;
+   keepMutedChatsArchived: boolean;
++  vesperKeepDeletedMessages: boolean;
+   usernameLastIntegrityCheck: number;
+   usernameCorrupted: boolean;
+   usernameLinkCorrupted: boolean;
+@@ -396,6 +397,7 @@ export const STORAGE_KEYS_TO_PRESERVE_AFTER_UNLINK = [
+   'universalExpireTimer',
+   'displayBadgesOnProfile',
+   'keepMutedChatsArchived',
++  'vesperKeepDeletedMessages',
+   'hasSetMyStoriesPrivacy',
+   'hasViewedOnboardingStory',
+   'hasKeyTransparencyDisabled',
+diff --git a/ts/util/deleteForEveryone.preload.ts b/ts/util/deleteForEveryone.preload.ts
+index 2e6ba1d33..5d6657d9f 100644
+--- a/ts/util/deleteForEveryone.preload.ts
++++ b/ts/util/deleteForEveryone.preload.ts
+@@ -13,6 +13,8 @@ import { isAciString } from './isAciString.std.ts';
+ import { eraseMessageContents } from './cleanup.preload.ts';
+ import { notificationService } from '../services/notifications.preload.ts';
+ import { DataWriter } from '../sql/Client.preload.ts';
++import { itemStorage } from '../textsecure/Storage.preload.ts';
++import { shouldKeepDeletedMessage } from './vesperDeleteForEveryone.std.ts';
+ 
+ const log = createLogger('deleteForEveryone');
+ 
+@@ -36,11 +38,8 @@ export async function receiveDeleteForEveryone(
+   );
+ 
+   // Our 1:1 stories are deleted through ts/util/onStoryRecipientUpdate.ts
+-  if (
+-    isStory(message.attributes) &&
+-    conversation &&
+-    isMe(conversation.attributes)
+-  ) {
++  const messageIsStory = isStory(message.attributes);
++  if (messageIsStory && conversation && isMe(conversation.attributes)) {
+     return;
+   }
+ 
+@@ -75,6 +74,27 @@ export async function receiveDeleteForEveryone(
+     return;
+   }
+ 
++  if (
++    shouldKeepDeletedMessage({
++      isAdminDelete: doe.isAdminDelete,
++      isIncoming: message.get('type') === 'incoming',
++      isStory: messageIsStory,
++      keepDeletedMessages:
++        itemStorage.get('vesperKeepDeletedMessages') === true,
++    })
++  ) {
++    log.info('Keeping message after a remote deletion request.', {
++      messageId: message.id,
++      targetConversationId: doe.targetConversationId,
++      targetSentTimestamp: doe.targetSentTimestamp,
++    });
++    message.set({ vesperDeletionRequested: true });
++    if (shouldPersist) {
++      await window.MessageCache.saveMessage(message.attributes);
++    }
++    return;
++  }
++
+   await applyDeleteForEveryone(message, doe, { shouldPersist });
+ }
+ 
+diff --git a/ts/util/vesperDeleteForEveryone.std.ts b/ts/util/vesperDeleteForEveryone.std.ts
+new file mode 100644
+index 000000000..b17bbcfa3
+--- /dev/null
++++ b/ts/util/vesperDeleteForEveryone.std.ts
+@@ -0,0 +1,16 @@
++// Copyright 2026 amber
++// SPDX-License-Identifier: AGPL-3.0-only
++
++export function shouldKeepDeletedMessage({
++  isAdminDelete,
++  isIncoming,
++  isStory,
++  keepDeletedMessages,
++}: Readonly<{
++  isAdminDelete: boolean;
++  isIncoming: boolean;
++  isStory: boolean;
++  keepDeletedMessages: boolean;
++}>): boolean {
++  return keepDeletedMessages && isIncoming && !isAdminDelete && !isStory;
++}

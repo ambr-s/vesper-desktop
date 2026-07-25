@@ -1,0 +1,219 @@
+From 69a8a5c912b03a66b1f56343aed7ced7cd95895a Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sat, 25 Jul 2026 19:18:41 +0100
+Subject: [PATCH 6/7] Isolate development protocol handlers
+
+Select production or development Vesper schemes from package identity and accept either scheme at the application boundary. Development builds no longer claim production Vesper handlers.
+---
+ app/main.main.ts                             | 26 +++++++++------
+ app/renderWindowsToast.std.tsx               | 16 +++++++--
+ ts/test-node/util/vesperProtocol_test.std.ts | 24 ++++++++++++++
+ ts/util/vesperProtocol.std.ts                | 35 ++++++++++++++++++--
+ 4 files changed, 86 insertions(+), 15 deletions(-)
+
+diff --git a/app/main.main.ts b/app/main.main.ts
+index 84913716a..90858fa41 100644
+--- a/app/main.main.ts
++++ b/app/main.main.ts
+@@ -42,9 +42,8 @@ import { missingCaseError } from '../ts/util/missingCaseError.std.ts';
+ import { strictAssert } from '../ts/util/assert.std.ts';
+ import { drop } from '../ts/util/drop.std.ts';
+ import {
++  getVesperProtocolSchemes,
+   normaliseVesperProtocol,
+-  VESPER_CAPTCHA_PROTOCOL_SCHEME,
+-  VESPER_PROTOCOL_SCHEME,
+ } from '../ts/util/vesperProtocol.std.ts';
+ import type { ThemeSettingType } from '../ts/util/theme.std.ts';
+ import { ThemeType } from '../ts/types/Util.std.ts';
+@@ -192,6 +191,7 @@ const development =
+   getEnvironment() === Environment.Staging;
+ 
+ const ciMode = config.get<'full' | 'benchmark' | false>('ciMode');
++const vesperProtocolSchemes = getVesperProtocolSchemes(packageJson.productName);
+ const localeDirectionTestingOverride = config.has(
+   'localeDirectionTestingOverride'
+ )
+@@ -2689,17 +2689,23 @@ app.on(
+   }
+ );
+ 
+-if (!app.isDefaultProtocolClient(VESPER_PROTOCOL_SCHEME)) {
+-  log.info('setting Vesper as the default app for the vesper URL scheme');
+-  app.setAsDefaultProtocolClient(VESPER_PROTOCOL_SCHEME);
++if (!app.isDefaultProtocolClient(vesperProtocolSchemes.app)) {
++  log.info(
++    `setting Vesper as the default app for ${vesperProtocolSchemes.app}`
++  );
++  app.setAsDefaultProtocolClient(vesperProtocolSchemes.app);
+ } else {
+-  log.info('Vesper is already registered for the vesper URL scheme.');
++  log.info(`Vesper is already registered for ${vesperProtocolSchemes.app}.`);
+ }
+-if (!app.isDefaultProtocolClient(VESPER_CAPTCHA_PROTOCOL_SCHEME)) {
+-  log.info('setting Vesper as the default app for the captcha URL scheme');
+-  app.setAsDefaultProtocolClient(VESPER_CAPTCHA_PROTOCOL_SCHEME);
++if (!app.isDefaultProtocolClient(vesperProtocolSchemes.captcha)) {
++  log.info(
++    `setting Vesper as the default app for ${vesperProtocolSchemes.captcha}`
++  );
++  app.setAsDefaultProtocolClient(vesperProtocolSchemes.captcha);
+ } else {
+-  log.info('Vesper is already registered for the captcha URL scheme.');
++  log.info(
++    `Vesper is already registered for ${vesperProtocolSchemes.captcha}.`
++  );
+ }
+ 
+ ipc.on(
+diff --git a/app/renderWindowsToast.std.tsx b/app/renderWindowsToast.std.tsx
+index bb0ca88cb..0ba90e314 100644
+--- a/app/renderWindowsToast.std.tsx
++++ b/app/renderWindowsToast.std.tsx
+@@ -8,13 +8,17 @@ import type { WindowsNotificationData } from '../ts/services/notifications.prelo
+ 
+ import { NotificationType } from '../ts/types/notifications.std.ts';
+ import { missingCaseError } from '../ts/util/missingCaseError.std.ts';
+-import { toVesperProtocol } from '../ts/util/vesperProtocol.std.ts';
++import {
++  getVesperProtocolSchemes,
++  toVesperProtocol,
++} from '../ts/util/vesperProtocol.std.ts';
+ import {
+   cancelPresentingRoute,
+   showConversationRoute,
+   showWindowRoute,
+   startCallLobbyRoute,
+ } from '../ts/util/signalRoutes.std.ts';
++import packageJson from '../package.json' with { type: 'json' };
+ 
+ function pathToUri(path: string) {
+   return `file:///${encodeURI(path.replace(/\\/g, '/'))}`;
+@@ -84,7 +88,15 @@ export function renderWindowsToast({
+   }
+ 
+   return renderToStaticMarkup(
+-    <Toast launch={toVesperProtocol(launch).href} activationType="protocol">
++    <Toast
++      launch={
++        toVesperProtocol(
++          launch,
++          getVesperProtocolSchemes(packageJson.productName)
++        ).href
++      }
++      activationType="protocol"
++    >
+       <Visual>
+         <Binding template={template}>
+           {image}
+diff --git a/ts/test-node/util/vesperProtocol_test.std.ts b/ts/test-node/util/vesperProtocol_test.std.ts
+index 0da49478a..cea47c92e 100644
+--- a/ts/test-node/util/vesperProtocol_test.std.ts
++++ b/ts/test-node/util/vesperProtocol_test.std.ts
+@@ -4,6 +4,7 @@
+ import { assert } from 'chai';
+ 
+ import {
++  getVesperProtocolSchemes,
+   normaliseVesperProtocol,
+   toVesperProtocol,
+ } from '../../util/vesperProtocol.std.ts';
+@@ -24,6 +25,17 @@ describe('Vesper protocol handling', () => {
+       );
+     });
+ 
++    it('maps development Vesper links to Signal route syntax', () => {
++      assert.equal(
++        normaliseVesperProtocol('vesper-development://show-window'),
++        'sgnl://show-window'
++      );
++      assert.equal(
++        normaliseVesperProtocol('vespercaptcha-development://opaque-token'),
++        'signalcaptcha://opaque-token'
++      );
++    });
++
+     it('leaves web links unchanged', () => {
+       assert.equal(
+         normaliseVesperProtocol('https://signal.me/#p/example'),
+@@ -46,5 +58,17 @@ describe('Vesper protocol handling', () => {
+         'vespercaptcha://opaque-token'
+       );
+     });
++
++    it('uses development schemes for development packages', () => {
++      const schemes = getVesperProtocolSchemes('Vesper Development');
++      assert.equal(
++        toVesperProtocol(new URL('sgnl://show-window'), schemes).href,
++        'vesper-development://show-window'
++      );
++      assert.equal(
++        toVesperProtocol(new URL('signalcaptcha://opaque-token'), schemes).href,
++        'vespercaptcha-development://opaque-token'
++      );
++    });
+   });
+ });
+diff --git a/ts/util/vesperProtocol.std.ts b/ts/util/vesperProtocol.std.ts
+index d9823f276..d40d82005 100644
+--- a/ts/util/vesperProtocol.std.ts
++++ b/ts/util/vesperProtocol.std.ts
+@@ -3,12 +3,38 @@
+ 
+ export const VESPER_PROTOCOL_SCHEME = 'vesper';
+ export const VESPER_CAPTCHA_PROTOCOL_SCHEME = 'vespercaptcha';
++export const VESPER_DEVELOPMENT_PROTOCOL_SCHEME = 'vesper-development';
++export const VESPER_DEVELOPMENT_CAPTCHA_PROTOCOL_SCHEME =
++  'vespercaptcha-development';
+ 
+ const ProtocolAliases = new Map([
+   [`${VESPER_PROTOCOL_SCHEME}:`, 'sgnl:'],
+   [`${VESPER_CAPTCHA_PROTOCOL_SCHEME}:`, 'signalcaptcha:'],
++  [`${VESPER_DEVELOPMENT_PROTOCOL_SCHEME}:`, 'sgnl:'],
++  [`${VESPER_DEVELOPMENT_CAPTCHA_PROTOCOL_SCHEME}:`, 'signalcaptcha:'],
+ ]);
+ 
++export type VesperProtocolSchemes = Readonly<{
++  app: string;
++  captcha: string;
++}>;
++
++export function getVesperProtocolSchemes(
++  productName: string
++): VesperProtocolSchemes {
++  if (productName === 'Vesper Development') {
++    return {
++      app: VESPER_DEVELOPMENT_PROTOCOL_SCHEME,
++      captcha: VESPER_DEVELOPMENT_CAPTCHA_PROTOCOL_SCHEME,
++    };
++  }
++
++  return {
++    app: VESPER_PROTOCOL_SCHEME,
++    captcha: VESPER_CAPTCHA_PROTOCOL_SCHEME,
++  };
++}
++
+ export function normaliseVesperProtocol(target: string): string {
+   for (const [vesperProtocol, signalProtocol] of ProtocolAliases) {
+     if (target.startsWith(vesperProtocol)) {
+@@ -19,13 +45,16 @@ export function normaliseVesperProtocol(target: string): string {
+   return target;
+ }
+ 
+-export function toVesperProtocol(target: URL): URL {
++export function toVesperProtocol(
++  target: URL,
++  schemes: VesperProtocolSchemes = getVesperProtocolSchemes('Vesper')
++): URL {
+   const result = new URL(target);
+ 
+   if (result.protocol === 'sgnl:') {
+-    result.protocol = `${VESPER_PROTOCOL_SCHEME}:`;
++    result.protocol = `${schemes.app}:`;
+   } else if (result.protocol === 'signalcaptcha:') {
+-    result.protocol = `${VESPER_CAPTCHA_PROTOCOL_SCHEME}:`;
++    result.protocol = `${schemes.captcha}:`;
+   }
+ 
+   return result;

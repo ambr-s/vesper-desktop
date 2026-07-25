@@ -1,0 +1,25 @@
+<!--
+  Copyright 2026 Vesper contributors
+  SPDX-License-Identifier: AGPL-3.0-only
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="night" x1="174" y1="82" x2="850" y2="942" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8D75FF"/>
+      <stop offset="1" stop-color="#5335DD"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="232" fill="url(#night)"/>
+  <path
+    d="M267 294 512 753 757 294"
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="108"
+  />
+  <path
+    d="m752 162 22 60 60 22-60 22-22 60-22-60-60-22 60-22 22-60Z"
+    fill="#F6F6FF"
+  />
+</svg>

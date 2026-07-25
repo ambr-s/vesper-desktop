@@ -1,0 +1,15 @@
+<!--
+  Copyright 2026 Vesper contributors
+  SPDX-License-Identifier: AGPL-3.0-only
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <path
+    d="M27 30 64 101 101 30"
+    fill="none"
+    stroke="#7152FF"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="16"
+  />
+  <path d="m99 10 4 11 11 4-11 4-4 11-4-11-11-4 11-4 4-11Z" fill="#7152FF"/>
+</svg>

@@ -1,0 +1,582 @@
+From 4ca38a04d9ad7c658cc94ea87210449948e0cceb Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sat, 25 Jul 2026 18:49:16 +0100
+Subject: [PATCH 2/7] Add opt-in diagnostic logging
+
+Keep logging disabled by default, apply changes without a restart, clear local logs and crash reports when disabled, and disable the Debug Log menu item while no logs are being collected.
+
+Adapted from Molly work by Oscar Mira and other Molly contributors.
+---
+ _locales/en/messages.json                     | 24 +++++++++++
+ app/main.main.ts                              | 20 ++++++++-
+ app/menu.std.ts                               |  2 +
+ ts/components/Preferences.dom.stories.tsx     |  2 +
+ ts/components/Preferences.dom.tsx             | 42 +++++++++++++++++++
+ ts/logging/log.std.ts                         | 26 +++++++++++-
+ ts/logging/set_up_renderer_logging.preload.ts | 10 ++++-
+ ts/main/settingsChannel.main.ts               |  2 +
+ ts/state/ducks/user.preload.ts                |  1 +
+ ts/state/smart/Preferences.preload.tsx        | 20 +++++++++
+ ts/test-node/app/menu_test.node.ts            | 29 ++++++++++++-
+ ts/types/menu.std.ts                          |  1 +
+ ts/util/createIPCEvents.preload.ts            | 11 ++++-
+ ts/util/preload.preload.ts                    |  1 +
+ ts/windows/main/preload_test.preload.ts       |  1 +
+ ts/windows/preload.preload.ts                 |  1 +
+ 16 files changed, 187 insertions(+), 6 deletions(-)
+
+diff --git a/_locales/en/messages.json b/_locales/en/messages.json
+index cfbf9e277..16ae2fc30 100644
+--- a/_locales/en/messages.json
++++ b/_locales/en/messages.json
+@@ -8892,6 +8892,30 @@
+     "messageformat": "Disable",
+     "description": "Text of the button confirm disabling screen security modal in Settings > Privacy > Application"
+   },
++  "icu:Vesper__Settings__Section": {
++    "messageformat": "Vesper",
++    "description": "Title of the Vesper section in Settings > Privacy"
++  },
++  "icu:Vesper__Settings__DebugLogging__Label": {
++    "messageformat": "Diagnostic logging",
++    "description": "Label of the diagnostic logging checkbox in Settings > Privacy > Vesper"
++  },
++  "icu:Vesper__Settings__DebugLogging__Description": {
++    "messageformat": "Store diagnostic logs on this computer. Logs may contain information about how you use the app.",
++    "description": "Description of the diagnostic logging checkbox in Settings > Privacy > Vesper"
++  },
++  "icu:Vesper__Settings__DebugLogging__DisableDialog__Title": {
++    "messageformat": "Turn off diagnostic logging?",
++    "description": "Title of the diagnostic logging disable confirmation"
++  },
++  "icu:Vesper__Settings__DebugLogging__DisableDialog__Description": {
++    "messageformat": "Turning logging off deletes the logs and crash reports stored on this computer. You will have less information to share if you need help with a problem.",
++    "description": "Description of the diagnostic logging disable confirmation"
++  },
++  "icu:Vesper__Settings__DebugLogging__DisableDialog__Action": {
++    "messageformat": "Turn off and delete",
++    "description": "Action in the diagnostic logging disable confirmation"
++  },
+   "icu:DialogUpdate--version-available": {
+     "messageformat": "Update to version {version} available",
+     "description": "Tooltip for new update available"
+diff --git a/app/main.main.ts b/app/main.main.ts
+index 8f2f9f8a2..237d45f14 100644
+--- a/app/main.main.ts
++++ b/app/main.main.ts
+@@ -46,7 +46,11 @@ import type { ThemeSettingType } from '../ts/util/theme.std.ts';
+ import { ThemeType } from '../ts/types/Util.std.ts';
+ import * as Errors from '../ts/types/errors.std.ts';
+ import { resolveCanonicalLocales } from '../ts/util/resolveCanonicalLocales.std.ts';
+-import { createLogger } from '../ts/logging/log.std.ts';
++import {
++  createLogger,
++  isLoggingEnabled,
++  setLoggingEnabled,
++} from '../ts/logging/log.std.ts';
+ import * as debugLog from '../ts/logging/debuglogs.node.ts';
+ import * as uploadDebugLog from '../ts/logging/uploadDebugLog.node.ts';
+ import { explodePromise } from '../ts/util/explodePromise.std.ts';
+@@ -1405,6 +1409,10 @@ type DebugLogWindowOptions = {
+ };
+ 
+ async function showDebugLogWindow(options: DebugLogWindowOptions = {}) {
++  if (!isLoggingEnabled()) {
++    return;
++  }
++
+   const newMode = options.mode ?? 'submit';
+ 
+   if (debugLogWindow) {
+@@ -2142,6 +2150,7 @@ app.on('ready', async () => {
+     session: session.defaultSession,
+   });
+ 
++  setLoggingEnabled(ephemeralConfig.get('vesper-debug-logging') === true);
+   await mainProcessLogging.initialize(getMainWindow);
+ 
+   const resourceService = OptionalResourceService.create(
+@@ -2434,6 +2443,7 @@ function setupMenu(options?: Partial<CreateTemplateOptionsType>) {
+   menuOptions = {
+     // options
+     development,
++    debugLoggingEnabled: isLoggingEnabled(),
+     devTools: defaultWebPrefs.devTools,
+     includeSetup: false,
+     isNightly: isNightly(version),
+@@ -3035,6 +3045,14 @@ const sendPreferencesChangedEventToWindows = () => {
+ ipc.on('preferences-changed', sendPreferencesChangedEventToWindows);
+ 
+ const onEphemeralSettingChanged = (name: string) => {
++  if (name === 'debugLogging') {
++    setLoggingEnabled(ephemeralConfig.get('vesper-debug-logging') === true);
++    if (ready) {
++      setupMenu();
++    }
++    return;
++  }
++
+   if (name !== 'contentProtection') {
+     return;
+   }
+diff --git a/app/menu.std.ts b/app/menu.std.ts
+index a8eb0ad12..a0f839e29 100644
+--- a/app/menu.std.ts
++++ b/app/menu.std.ts
+@@ -25,6 +25,7 @@ export const createTemplate = (
+ 
+   const {
+     isProduction,
++    debugLoggingEnabled,
+     devTools,
+     includeSetup,
+     openContactUs,
+@@ -140,6 +141,7 @@ export const createTemplate = (
+         {
+           label: i18n('icu:debugLog'),
+           click: showDebugLog,
++          enabled: debugLoggingEnabled,
+         },
+         ...(devTools
+           ? [
+diff --git a/ts/components/Preferences.dom.stories.tsx b/ts/components/Preferences.dom.stories.tsx
+index 803a980c0..7fe5da66f 100644
+--- a/ts/components/Preferences.dom.stories.tsx
++++ b/ts/components/Preferences.dom.stories.tsx
+@@ -468,6 +468,7 @@ export default {
+     hasCallNotifications: true,
+     hasCallRingtoneNotification: false,
+     hasContentProtection: false,
++    hasDebugLogging: false,
+     hasCountMutedConversations: false,
+     hasFailedStorySends: false,
+     hasHideMenuBar: false,
+@@ -596,6 +597,7 @@ export default {
+       'onCallRingtoneNotificationChange'
+     ),
+     onContentProtectionChange: action('onContentProtectionChange'),
++    onDebugLoggingChange: action('onDebugLoggingChange'),
+     onCountMutedConversationsChange: action('onCountMutedConversationsChange'),
+     onEmojiSkinToneDefaultChange: action('onEmojiSkinToneDefaultChange'),
+     onHasKeyTransparencyDisabledChanged: action(
+diff --git a/ts/components/Preferences.dom.tsx b/ts/components/Preferences.dom.tsx
+index a5ffcb4fb..bd14797b7 100644
+--- a/ts/components/Preferences.dom.tsx
++++ b/ts/components/Preferences.dom.tsx
+@@ -141,6 +141,7 @@ export type PropsDataType = {
+   hasCallNotifications: boolean;
+   hasCallRingtoneNotification: boolean;
+   hasContentProtection: boolean | undefined;
++  hasDebugLogging: boolean | undefined;
+   hasCountMutedConversations: boolean;
+   hasHideMenuBar?: boolean;
+   hasIncomingCallNotifications: boolean;
+@@ -322,6 +323,7 @@ type PropsFunctionType = {
+   onCallNotificationsChange: CheckboxChangeHandlerType;
+   onCallRingtoneNotificationChange: CheckboxChangeHandlerType;
+   onContentProtectionChange: CheckboxChangeHandlerType;
++  onDebugLoggingChange: CheckboxChangeHandlerType;
+   onCountMutedConversationsChange: CheckboxChangeHandlerType;
+   onEmojiSkinToneDefaultChange: (emojiSkinTone: Emoji.SkinTone) => void;
+   onHasKeyTransparencyDisabledChanged: SelectChangeHandlerType<boolean>;
+@@ -450,6 +452,7 @@ export function Preferences({
+   hasCallNotifications,
+   hasCallRingtoneNotification,
+   hasContentProtection,
++  hasDebugLogging,
+   hasCountMutedConversations,
+   hasFailedStorySends,
+   hasHideMenuBar,
+@@ -502,6 +505,7 @@ export function Preferences({
+   onCallNotificationsChange,
+   onCallRingtoneNotificationChange,
+   onContentProtectionChange,
++  onDebugLoggingChange,
+   onCountMutedConversationsChange,
+   onEmojiSkinToneDefaultChange,
+   onHasKeyTransparencyDisabledChanged,
+@@ -615,6 +619,7 @@ export function Preferences({
+   const [confirmStoriesOff, setConfirmStoriesOff] = useState(false);
+   const [confirmContentProtection, setConfirmContentProtection] =
+     useState(false);
++  const [confirmDebugLoggingOff, setConfirmDebugLoggingOff] = useState(false);
+   const [showSyncFailed, setShowSyncFailed] = useState(false);
+   const [nowSyncing, setNowSyncing] = useState(false);
+   const [showDisappearingTimerDialog, setShowDisappearingTimerDialog] =
+@@ -1863,6 +1868,43 @@ export function Preferences({
+             </AxoConfirmDialog.Action>
+           </AxoConfirmDialog.Root>
+         ) : null}
++        <SettingsRow title={i18n('icu:Vesper__Settings__Section')}>
++          <Checkbox
++            checked={hasDebugLogging}
++            disabled={hasDebugLogging === undefined}
++            description={i18n(
++              'icu:Vesper__Settings__DebugLogging__Description'
++            )}
++            label={i18n('icu:Vesper__Settings__DebugLogging__Label')}
++            moduleClassName="Preferences__checkbox"
++            name="debugLogging"
++            onChange={value => {
++              if (value) {
++                onDebugLoggingChange(true);
++              } else {
++                setConfirmDebugLoggingOff(true);
++              }
++            }}
++          />
++        </SettingsRow>
++        <AxoConfirmDialog.Root
++          open={confirmDebugLoggingOff}
++          onOpenChange={setConfirmDebugLoggingOff}
++          title={i18n(
++            'icu:Vesper__Settings__DebugLogging__DisableDialog__Title'
++          )}
++          description={i18n(
++            'icu:Vesper__Settings__DebugLogging__DisableDialog__Description'
++          )}
++        >
++          <AxoConfirmDialog.Cancel />
++          <AxoConfirmDialog.Action
++            variant="strong-destructive"
++            onClick={() => onDebugLoggingChange(false)}
++          >
++            {i18n('icu:Vesper__Settings__DebugLogging__DisableDialog__Action')}
++          </AxoConfirmDialog.Action>
++        </AxoConfirmDialog.Root>
+         <SettingsRow title={i18n('icu:Stories__title')}>
+           <FlowingControl>
+             <div className="Preferences__two-thirds-flow">
+diff --git a/ts/logging/log.std.ts b/ts/logging/log.std.ts
+index 17fe86fd0..e26a3ea4e 100644
+--- a/ts/logging/log.std.ts
++++ b/ts/logging/log.std.ts
+@@ -16,6 +16,18 @@ let redactAll = (value: string) => value;
+ 
+ let destination: pino.DestinationStream | undefined;
+ let buffer = new Array<string>();
++let loggingEnabled = false;
++
++export function setLoggingEnabled(enabled: boolean): void {
++  loggingEnabled = enabled;
++  if (!enabled) {
++    buffer = [];
++  }
++}
++
++export function isLoggingEnabled(): boolean {
++  return loggingEnabled;
++}
+ 
+ const COLORS = [
+   '#2c6bed',
+@@ -171,6 +183,10 @@ const pinoInstance = pino(
+     },
+     hooks: {
+       logMethod(args, method, level) {
++        if (!loggingEnabled) {
++          return;
++        }
++
+         debugLog(this, args, level);
+ 
+         // Always call original method, but with stringified arguments for
+@@ -196,6 +212,10 @@ const pinoInstance = pino(
+   },
+   {
+     write(msg) {
++      if (!loggingEnabled) {
++        return;
++      }
++
+       if (destination == null) {
+         buffer.push(msg);
+       } else {
+@@ -243,7 +263,9 @@ export function setPinoDestination(
+   redactAll = newRedactAll;
+   const queued = buffer;
+   buffer = [];
+-  for (const msg of queued) {
+-    destination.write(msg);
++  if (loggingEnabled) {
++    for (const msg of queued) {
++      destination.write(msg);
++    }
+   }
+ }
+diff --git a/ts/logging/set_up_renderer_logging.preload.ts b/ts/logging/set_up_renderer_logging.preload.ts
+index 0eb2ec501..c3d64aadb 100644
+--- a/ts/logging/set_up_renderer_logging.preload.ts
++++ b/ts/logging/set_up_renderer_logging.preload.ts
+@@ -9,7 +9,7 @@ import {
+   LogLevel as SignalClientLogLevel,
+ } from '@signalapp/libsignal-client';
+ 
+-import { setPinoDestination, log } from './log.std.ts';
++import { setLoggingEnabled, setPinoDestination, log } from './log.std.ts';
+ import * as Errors from '../types/errors.std.ts';
+ import { createRotatingPinoDest } from '../util/rotatingPinoDest.node.ts';
+ import { redactAll } from '../util/privacy.node.ts';
+@@ -27,6 +27,14 @@ export function initialize(): void {
+   }
+   isInitialized = true;
+ 
++  void (async () => {
++    const value = await ipc.invoke('settings:get:debugLogging');
++    setLoggingEnabled(value === true);
++  })();
++  ipc.on('settings:update:debugLogging', (_event, value) => {
++    setLoggingEnabled(value === true);
++  });
++
+   const basePath = ipc.sendSync('get-user-data-path');
+   const logFile = path.join(basePath, 'logs', 'app.log');
+ 
+diff --git a/ts/main/settingsChannel.main.ts b/ts/main/settingsChannel.main.ts
+index 64cf7b135..98bf35265 100644
+--- a/ts/main/settingsChannel.main.ts
++++ b/ts/main/settingsChannel.main.ts
+@@ -21,6 +21,7 @@ const EPHEMERAL_NAME_MAP = new Map([
+   ['themeSetting', 'theme-setting'],
+   ['localeOverride', 'localeOverride'],
+   ['contentProtection', 'contentProtection'],
++  ['debugLogging', 'vesper-debug-logging'],
+ ]);
+ 
+ export class SettingsChannel extends EventEmitter {
+@@ -49,6 +50,7 @@ export class SettingsChannel extends EventEmitter {
+     this.#installEphemeralSetting('localeOverride');
+     this.#installEphemeralSetting('spellCheck');
+     this.#installEphemeralSetting('contentProtection');
++    this.#installEphemeralSetting('debugLogging');
+ 
+     installPermissionsHandler({ session: session.defaultSession, userConfig });
+ 
+diff --git a/ts/state/ducks/user.preload.ts b/ts/state/ducks/user.preload.ts
+index 0724e8a2e..85d3d3f77 100644
+--- a/ts/state/ducks/user.preload.ts
++++ b/ts/state/ducks/user.preload.ts
+@@ -143,6 +143,7 @@ export function getEmptyState(): UserStateType {
+     localeMessages: {},
+     menuOptions: {
+       development: false,
++      debugLoggingEnabled: false,
+       devTools: false,
+       includeSetup: false,
+       isNightly: false,
+diff --git a/ts/state/smart/Preferences.preload.tsx b/ts/state/smart/Preferences.preload.tsx
+index 1c358ed49..35fbe8b93 100644
+--- a/ts/state/smart/Preferences.preload.tsx
++++ b/ts/state/smart/Preferences.preload.tsx
+@@ -119,6 +119,7 @@ import type { ExternalProps as SmartNotificationProfilesProps } from './Preferen
+ import { useMegaphonesActions } from '../ducks/megaphones.preload.ts';
+ import type { ZoomFactorType } from '../../types/StorageKeys.std.ts';
+ import { isLocalBackupsEnabled } from '../../util/isLocalBackupsEnabled.preload.ts';
++import { deleteAllLogs } from '../../util/deleteAllLogs.preload.ts';
+ import { getBackupKeyHash } from '../../services/backups/crypto.preload.ts';
+ import { Emoji } from '../../axo/emoji.std.ts';
+ import { AppProvider } from '../../windows/AppProvider.dom.tsx';
+@@ -404,6 +405,7 @@ export function SmartPreferences(): JSX.Element | null {
+     useState<SystemTraySetting>();
+   const [hasContentProtection, setContentProtection] = useState<boolean>();
+   const [hasSpellCheck, setSpellCheck] = useState<boolean>();
++  const [hasDebugLogging, setDebugLogging] = useState<boolean>();
+   const [themeSetting, setThemeSetting] = useState<ThemeType>();
+ 
+   useEffect(() => {
+@@ -442,6 +444,15 @@ export function SmartPreferences(): JSX.Element | null {
+     };
+     drop(loadContentProtection());
+ 
++    const loadDebugLogging = async () => {
++      const value = await window.Events.getDebugLogging();
++      if (canceled) {
++        return;
++      }
++      setDebugLogging(value);
++    };
++    drop(loadDebugLogging());
++
+     const loadThemeSetting = async () => {
+       const value = await window.Events.getThemeSetting();
+       if (canceled) {
+@@ -486,6 +497,13 @@ export function SmartPreferences(): JSX.Element | null {
+     setContentProtection(value);
+     await window.Events.setContentProtection(value);
+   };
++  const onDebugLoggingChange = async (value: boolean) => {
++    setDebugLogging(value);
++    await window.Events.setDebugLogging(value);
++    if (!value) {
++      await Promise.all([deleteAllLogs(), window.IPC.crashReports.erase()]);
++    }
++  };
+   const onThemeChange = (value: ThemeType) => {
+     setThemeSetting(value);
+     drop(window.Events.setThemeSetting(value));
+@@ -940,6 +958,7 @@ export function SmartPreferences(): JSX.Element | null {
+         hasCallNotifications={hasCallNotifications}
+         hasCallRingtoneNotification={hasCallRingtoneNotification}
+         hasContentProtection={hasContentProtection}
++        hasDebugLogging={hasDebugLogging}
+         hasCountMutedConversations={hasCountMutedConversations}
+         hasFailedStorySends={hasFailedStorySends}
+         hasHideMenuBar={hasHideMenuBar}
+@@ -994,6 +1013,7 @@ export function SmartPreferences(): JSX.Element | null {
+         onCallNotificationsChange={onCallNotificationsChange}
+         onCallRingtoneNotificationChange={onCallRingtoneNotificationChange}
+         onContentProtectionChange={onContentProtectionChange}
++        onDebugLoggingChange={onDebugLoggingChange}
+         onCountMutedConversationsChange={onCountMutedConversationsChange}
+         onEmojiSkinToneDefaultChange={onEmojiSkinToneDefaultChange}
+         onHasKeyTransparencyDisabledChanged={
+diff --git a/ts/test-node/app/menu_test.node.ts b/ts/test-node/app/menu_test.node.ts
+index 9c38b9148..9dc959876 100644
+--- a/ts/test-node/app/menu_test.node.ts
++++ b/ts/test-node/app/menu_test.node.ts
+@@ -71,7 +71,7 @@ const getExpectedViewMenu = (): MenuItemConstructorOptions => ({
+     { type: 'separator' },
+     { label: 'Toggle Full Screen', role: 'togglefullscreen' },
+     { type: 'separator' },
+-    { label: 'Debug Log', click: showDebugLog },
++    { label: 'Debug Log', click: showDebugLog, enabled: true },
+     { type: 'separator' },
+     { label: 'Toggle Developer Tools', role: 'toggleDevTools' },
+     { label: 'Force Update', click: forceUpdate },
+@@ -250,6 +250,7 @@ describe('createTemplate', () => {
+       it('should return the correct template without setup options', () => {
+         const options: CreateTemplateOptionsType = {
+           development: false,
++          debugLoggingEnabled: true,
+           devTools: true,
+           includeSetup: false,
+           isNightly: false,
+@@ -265,6 +266,7 @@ describe('createTemplate', () => {
+       it('should return correct template with setup options', () => {
+         const options: CreateTemplateOptionsType = {
+           development: false,
++          debugLoggingEnabled: true,
+           devTools: true,
+           includeSetup: true,
+           isNightly: false,
+@@ -292,4 +294,29 @@ describe('createTemplate', () => {
+       });
+     });
+   });
++
++  it('disables the debug log item when diagnostic logging is off', () => {
++    const template = createTemplate(
++      {
++        development: false,
++        debugLoggingEnabled: false,
++        devTools: true,
++        includeSetup: false,
++        isNightly: false,
++        isProduction: true,
++        platform: 'linux',
++        ...actions,
++      },
++      i18n
++    );
++    const viewMenu = template.find(item => item.label === '&View');
++    if (!Array.isArray(viewMenu?.submenu)) {
++      throw new Error('View menu is missing');
++    }
++    const debugLogItem = (viewMenu.submenu as MenuListType).find(
++      item => item.label === 'Debug Log'
++    );
++
++    assert.equal(debugLogItem?.enabled, false);
++  });
+ });
+diff --git a/ts/types/menu.std.ts b/ts/types/menu.std.ts
+index aa5cf142b..475963971 100644
+--- a/ts/types/menu.std.ts
++++ b/ts/types/menu.std.ts
+@@ -7,6 +7,7 @@ export type MenuListType = Array<MenuItemConstructorOptions>;
+ 
+ export type MenuOptionsType = Readonly<{
+   development: boolean;
++  debugLoggingEnabled: boolean;
+   devTools: boolean;
+   includeSetup: boolean;
+   isNightly: boolean;
+diff --git a/ts/util/createIPCEvents.preload.ts b/ts/util/createIPCEvents.preload.ts
+index 723eb03b8..988f913cd 100644
+--- a/ts/util/createIPCEvents.preload.ts
++++ b/ts/util/createIPCEvents.preload.ts
+@@ -15,7 +15,7 @@ import { isInCall } from '../state/selectors/calling.std.ts';
+ 
+ import * as Registration from './registration.preload.ts';
+ import { lookupConversationWithoutServiceId } from './lookupConversationWithoutServiceId.preload.ts';
+-import { createLogger } from '../logging/log.std.ts';
++import { createLogger, setLoggingEnabled } from '../logging/log.std.ts';
+ import {
+   type NotificationClickData,
+   notificationService,
+@@ -90,6 +90,7 @@ type ValuesWithGetters = Omit<
+   | 'mediaCameraPermissions'
+   | 'spellCheck'
+   | 'contentProtection'
++  | 'debugLogging'
+   | 'systemTraySetting'
+   | 'themeSetting'
+   | 'zoomFactor'
+@@ -124,6 +125,7 @@ export type IPCEventsGettersType = {
+   getMediaCameraPermissions: () => Promise<boolean>;
+   getSpellCheck: () => Promise<boolean>;
+   getContentProtection: () => Promise<boolean>;
++  getDebugLogging: () => Promise<boolean>;
+   getSystemTraySetting: () => Promise<SystemTraySetting>;
+   getThemeSetting: () => Promise<ThemeType>;
+   getZoomFactor: () => Promise<ZoomFactorType>;
+@@ -215,6 +217,13 @@ export function createIPCEvents(
+     setContentProtection: async (value: boolean) => {
+       await setEphemeralSetting('contentProtection', value);
+     },
++    getDebugLogging: async () => {
++      return (await getEphemeralSetting('debugLogging')) ?? false;
++    },
++    setDebugLogging: async (value: boolean) => {
++      setLoggingEnabled(value);
++      await setEphemeralSetting('debugLogging', value);
++    },
+     getSpellCheck: async () => {
+       return (await getEphemeralSetting('spellCheck')) ?? false;
+     },
+diff --git a/ts/util/preload.preload.ts b/ts/util/preload.preload.ts
+index 86da4ce9a..c7d971740 100644
+--- a/ts/util/preload.preload.ts
++++ b/ts/util/preload.preload.ts
+@@ -24,6 +24,7 @@ export type EphemeralSettings = {
+   localeOverride: string | null;
+   spellCheck: boolean;
+   contentProtection: boolean;
++  debugLogging: boolean;
+   systemTraySetting: SystemTraySetting;
+   themeSetting: ThemeType;
+ };
+diff --git a/ts/windows/main/preload_test.preload.ts b/ts/windows/main/preload_test.preload.ts
+index afee1002b..536ec006f 100644
+--- a/ts/windows/main/preload_test.preload.ts
++++ b/ts/windows/main/preload_test.preload.ts
+@@ -119,6 +119,7 @@ window.testUtilities = {
+       },
+       menuOptions: {
+         development: false,
++        debugLoggingEnabled: false,
+         devTools: false,
+         includeSetup: false,
+         isNightly: false,
+diff --git a/ts/windows/preload.preload.ts b/ts/windows/preload.preload.ts
+index 3ac3a8a33..abee6db14 100644
+--- a/ts/windows/preload.preload.ts
++++ b/ts/windows/preload.preload.ts
+@@ -4,6 +4,7 @@
+ import { installEphemeralSetting } from '../util/preload.preload.ts';
+ 
+ installEphemeralSetting('contentProtection');
++installEphemeralSetting('debugLogging');
+ installEphemeralSetting('localeOverride');
+ installEphemeralSetting('spellCheck');
+ installEphemeralSetting('systemTraySetting');

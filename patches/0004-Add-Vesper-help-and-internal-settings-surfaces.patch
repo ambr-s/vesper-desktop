@@ -1,0 +1,355 @@
+From 547fc36bbafefcb5a6755811d387042220712116 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sat, 25 Jul 2026 18:59:37 +0100
+Subject: [PATCH 4/7] Add Vesper help and internal settings surfaces
+
+Expose the hidden settings behind seven version taps, replace the visible About content, and route help links to Vesper resources.
+
+Adapted from settings and help work by Oscar Mira and other Molly contributors.
+---
+ _locales/en/messages.json                 | 28 +++++++++++++++++++++++
+ app/main.main.ts                          | 17 ++++++--------
+ stylesheets/components/About.scss         | 18 +++++++--------
+ ts/components/About.dom.tsx               | 22 +++++++++++-------
+ ts/components/Preferences.dom.stories.tsx |  2 ++
+ ts/components/Preferences.dom.tsx         | 25 ++++++++++++++++++++
+ ts/state/smart/Preferences.preload.tsx    | 10 +++++++-
+ ts/types/StorageKeys.std.ts               |  2 ++
+ 8 files changed, 95 insertions(+), 29 deletions(-)
+
+diff --git a/_locales/en/messages.json b/_locales/en/messages.json
+index 626b0e50b..6a6fd5996 100644
+--- a/_locales/en/messages.json
++++ b/_locales/en/messages.json
+@@ -123,6 +123,30 @@
+     "messageformat": "{appEnv} (Intel)",
+     "description": "AboutWindow > App Environment Info > On Apple Intel Devices"
+   },
++  "icu:Vesper__About__Title": {
++    "messageformat": "Vesper",
++    "description": "Product title in the Vesper about window"
++  },
++  "icu:Vesper__About__SignalAcknowledgements": {
++    "messageformat": "Signal Desktop acknowledgements",
++    "description": "Link to the upstream Signal Desktop acknowledgements"
++  },
++  "icu:Vesper__About__SourceCode": {
++    "messageformat": "Vesper source code",
++    "description": "Link to the Vesper source repository"
++  },
++  "icu:Vesper__About__Licence": {
++    "messageformat": "GNU AGPL v3 licence",
++    "description": "Link to the Vesper licence"
++  },
++  "icu:Vesper__About__Attribution": {
++    "messageformat": "Vesper is based on Signal Desktop and is free software under the GNU Affero General Public License, version 3 only.",
++    "description": "Upstream and licence attribution in the Vesper about window"
++  },
++  "icu:Vesper__About__Trademark": {
++    "messageformat": "Signal is a trademark of Signal Messenger, LLC. Vesper is not affiliated with or endorsed by Signal.",
++    "description": "Signal trademark notice in the Vesper about window"
++  },
+   "icu:copyErrorAndQuit": {
+     "messageformat": "Copy error and quit",
+     "description": "Shown in the top-level error popup, allowing user to copy the error text and close the app"
+@@ -8896,6 +8920,10 @@
+     "messageformat": "Vesper",
+     "description": "Title of the Vesper section in Settings > Privacy"
+   },
++  "icu:Vesper__Settings__Version": {
++    "messageformat": "Vesper version",
++    "description": "Label beside the Vesper version in Settings > General"
++  },
+   "icu:Vesper__Settings__DebugLogging__Label": {
+     "messageformat": "Diagnostic logging",
+     "description": "Label of the diagnostic logging checkbox in Settings > Privacy > Vesper"
+diff --git a/app/main.main.ts b/app/main.main.ts
+index 237d45f14..5177bc28e 100644
+--- a/app/main.main.ts
++++ b/app/main.main.ts
+@@ -38,7 +38,6 @@ import { setup as setupCrashReports } from './crashReports.main.ts';
+ import { setup as setupSpellChecker } from './spell_check.main.ts';
+ import { getDNSFallback } from './dns-fallback.main.ts';
+ import { redactAll, addSensitivePath } from './privacy.main.ts';
+-import { createSupportUrl } from '../ts/util/createSupportUrl.std.ts';
+ import { missingCaseError } from '../ts/util/missingCaseError.std.ts';
+ import { strictAssert } from '../ts/util/assert.std.ts';
+ import { drop } from '../ts/util/drop.std.ts';
+@@ -1216,14 +1215,12 @@ const TEN_MINUTES = 10 * 60 * 1000;
+ setTimeout(readyForUpdates, TEN_MINUTES);
+ 
+ function openContactUs() {
+-  drop(shell.openExternal(createSupportUrl({ locale: app.getLocale() })));
++  drop(shell.openExternal('https://amber.systems'));
+ }
+ 
+ function openJoinTheBeta() {
+   // If we omit the language, the site will detect the language and redirect
+-  drop(
+-    shell.openExternal('https://support.signal.org/hc/articles/360007318471')
+-  );
++  drop(shell.openExternal('https://github.com/ambr-s/vesper-desktop/releases'));
+ }
+ 
+ function openReleaseNotes() {
+@@ -1234,20 +1231,20 @@ function openReleaseNotes() {
+ 
+   drop(
+     shell.openExternal(
+-      `https://github.com/signalapp/Signal-Desktop/releases/tag/v${app.getVersion()}`
++      `https://github.com/ambr-s/vesper-desktop/releases/tag/v${app.getVersion()}`
+     )
+   );
+ }
+ 
+ function openSupportPage() {
+   // If we omit the language, the site will detect the language and redirect
+-  drop(
+-    shell.openExternal('https://support.signal.org/hc/sections/360001602812')
+-  );
++  drop(shell.openExternal('https://github.com/ambr-s/vesper-desktop/issues'));
+ }
+ 
+ function openForums() {
+-  drop(shell.openExternal('https://community.signalusers.org/'));
++  drop(
++    shell.openExternal('https://github.com/ambr-s/vesper-desktop/discussions')
++  );
+ }
+ 
+ function showKeyboardShortcuts() {
+diff --git a/stylesheets/components/About.scss b/stylesheets/components/About.scss
+index e7c0b8271..14a39f941 100644
+--- a/stylesheets/components/About.scss
++++ b/stylesheets/components/About.scss
+@@ -13,16 +13,8 @@
+   justify-content: center;
+   overflow: hidden;
+   text-align: center;
+-
+-  @include mixins.light-theme {
+-    background-color: variables.$color-white;
+-    color: variables.$color-black;
+-  }
+-
+-  @include mixins.dark-theme {
+-    background-color: variables.$color-gray-95;
+-    color: variables.$color-white-alpha-80;
+-  }
++  background-color: var(--axo-color-surface-primary);
++  color: var(--axo-color-label-primary);
+ 
+   img {
+     margin-top: 1em;
+@@ -42,3 +34,9 @@
+   @include mixins.font-body-1-bold;
+   margin: 0;
+ }
++
++.About__Attribution {
++  color: var(--axo-color-label-secondary);
++  max-width: 360px;
++  margin-top: 16px;
++}
+diff --git a/ts/components/About.dom.tsx b/ts/components/About.dom.tsx
+index 5d2784ffc..fa49c16bc 100644
+--- a/ts/components/About.dom.tsx
++++ b/ts/components/About.dom.tsx
+@@ -5,7 +5,6 @@ import type { JSX } from 'react';
+ 
+ import type { LocalizerType } from '../types/Util.std.ts';
+ import { useEscapeHandling } from '../hooks/useEscapeHandling.dom.ts';
+-import { tw } from '../axo/tw.dom.tsx';
+ 
+ export type AboutProps = Readonly<{
+   closeAbout: () => unknown;
+@@ -43,12 +42,12 @@ export function About({
+       <div className="module-splash-screen">
+         <div className="module-splash-screen__logo module-splash-screen__logo--128" />
+ 
+-        <h1 className="About__Title">{i18n('icu:signalDesktop')}</h1>
++        <h1 className="About__Title">{i18n('icu:Vesper__About__Title')}</h1>
+         <div className="version">{version}</div>
+         <div className="environment">{env}</div>
+         <br />
+         <div>
+-          <a href="https://signal.org">signal.org</a>
++          <a href="https://amber.systems">amber.systems</a>
+         </div>
+         <br />
+         <div>
+@@ -56,16 +55,23 @@ export function About({
+             className="acknowledgments"
+             href="https://github.com/signalapp/Signal-Desktop/blob/main/ACKNOWLEDGMENTS.md"
+           >
+-            {i18n('icu:softwareAcknowledgments')}
++            {i18n('icu:Vesper__About__SignalAcknowledgements')}
+           </a>
+         </div>
+         <div>
+-          <a className="privacy" href="https://signal.org/legal">
+-            {i18n('icu:privacyPolicy')}
++          <a href="https://github.com/ambr-s/vesper-desktop">
++            {i18n('icu:Vesper__About__SourceCode')}
+           </a>
+         </div>
+-        <div className={tw('text-secondary')}>
+-          {i18n('icu:signalNonProfit')}
++        <div>
++          <a href="https://github.com/ambr-s/vesper-desktop/blob/main/LICENSE">
++            {i18n('icu:Vesper__About__Licence')}
++          </a>
++        </div>
++        <div className="About__Attribution">
++          {i18n('icu:Vesper__About__Attribution')}
++          <br />
++          {i18n('icu:Vesper__About__Trademark')}
+         </div>
+       </div>
+     </div>
+diff --git a/ts/components/Preferences.dom.stories.tsx b/ts/components/Preferences.dom.stories.tsx
+index 9038f7773..9bf1cc4ef 100644
+--- a/ts/components/Preferences.dom.stories.tsx
++++ b/ts/components/Preferences.dom.stories.tsx
+@@ -539,6 +539,7 @@ export default {
+     whoCanFindMe: PhoneNumberDiscoverability.Discoverable,
+     whoCanSeeMe: PhoneNumberSharingMode.Everybody,
+     zoomFactor: 1,
++    version: '8.20.0',
+ 
+     renderDonationsPane: ({
+       contentsRef,
+@@ -642,6 +643,7 @@ export default {
+     onWhoCanFindMeChange: action('onWhoCanFindMeChange'),
+     onWhoCanSeeMeChange: action('onWhoCanSeeMeChange'),
+     onZoomFactorChange: action('onZoomFactorChange'),
++    onToggleInternalSettings: action('onToggleInternalSettings'),
+     openFileInFolder: action('openFileInFolder'),
+     pickLocalBackupFolder: () =>
+       Promise.resolve('/home/signaluser/Signal Backups/'),
+diff --git a/ts/components/Preferences.dom.tsx b/ts/components/Preferences.dom.tsx
+index 51ec201db..dc692fca7 100644
+--- a/ts/components/Preferences.dom.tsx
++++ b/ts/components/Preferences.dom.tsx
+@@ -178,6 +178,7 @@ export type PropsDataType = {
+   whoCanFindMe: PhoneNumberDiscoverability;
+   whoCanSeeMe: PhoneNumberSharingMode;
+   zoomFactor: ZoomFactorType | undefined;
++  version: string;
+ 
+   // Localization
+   availableLocales: ReadonlyArray<string>;
+@@ -361,6 +362,7 @@ type PropsFunctionType = {
+   onWhoCanFindMeChange: SelectChangeHandlerType<PhoneNumberDiscoverability>;
+   onWhoCanSeeMeChange: SelectChangeHandlerType<PhoneNumberSharingMode>;
+   onZoomFactorChange: SelectChangeHandlerType<ZoomFactorType>;
++  onToggleInternalSettings: () => void;
+   openFileInFolder: (path: string) => void;
+   internalDeleteAllMegaphones: () => Promise<number>;
+   __dangerouslyRunAbitraryReadOnlySqlQuery: (
+@@ -545,6 +547,7 @@ export function Preferences({
+   onWhoCanFindMeChange,
+   onWhoCanSeeMeChange,
+   onZoomFactorChange,
++  onToggleInternalSettings,
+   otherTabsUnreadStats,
+   settingsLocation,
+   phoneNumber = '',
+@@ -570,6 +573,7 @@ export function Preferences({
+   resetAllChatColors,
+   resetDefaultChatColor,
+   resolvedLocale,
++  version,
+   savePreferredLeftPaneWidth,
+   selectedCamera,
+   selectedMicrophone,
+@@ -637,6 +641,7 @@ export function Preferences({
+     string | null | undefined
+   >(localeOverride);
+   const [languageSearchInput, setLanguageSearchInput] = useState('');
++  const [versionTapCount, setVersionTapCount] = useState(0);
+   const [confirmPnpNotDiscoverable, setConfirmPnpNoDiscoverable] =
+     useState(false);
+ 
+@@ -865,6 +870,26 @@ export function Preferences({
+               {i18n('icu:Preferences--device-name__description')}
+             </div>
+           </FlowingControl>
++          <Control
++            left={i18n('icu:Vesper__Settings__Version')}
++            right={
++              <AxoButton.Root
++                variant="subtle-secondary"
++                size="md"
++                onClick={() => {
++                  const nextTapCount = versionTapCount + 1;
++                  if (nextTapCount >= 7) {
++                    setVersionTapCount(0);
++                    onToggleInternalSettings();
++                  } else {
++                    setVersionTapCount(nextTapCount);
++                  }
++                }}
++              >
++                {version}
++              </AxoButton.Root>
++            }
++          />
+         </SettingsRow>
+         <SettingsRow title={i18n('icu:Preferences--system')}>
+           {isAutoLaunchSupported && (
+diff --git a/ts/state/smart/Preferences.preload.tsx b/ts/state/smart/Preferences.preload.tsx
+index a35f12655..777cbb35a 100644
+--- a/ts/state/smart/Preferences.preload.tsx
++++ b/ts/state/smart/Preferences.preload.tsx
+@@ -634,7 +634,8 @@ export function SmartPreferences(): JSX.Element | null {
+   const emojiSkinToneDefault =
+     items.emojiSkinToneDefault ?? Emoji.SkinTone.None;
+   const isInternalUser =
+-    items.remoteConfig?.['desktop.internalUser']?.enabled ?? false;
++    (items.remoteConfig?.['desktop.internalUser']?.enabled ?? false) ||
++    items.vesperInternalSettings === true;
+   const isContentProtectionSupported =
+     Settings.isContentProtectionSupported(OS);
+   const isContentProtectionNeeded = Settings.isContentProtectionNeeded(OS);
+@@ -1086,6 +1087,7 @@ export function SmartPreferences(): JSX.Element | null {
+         resetAllChatColors={resetAllChatColors}
+         resetDefaultChatColor={resetDefaultChatColor}
+         resolvedLocale={resolvedLocale}
++        version={version}
+         savePreferredLeftPaneWidth={savePreferredLeftPaneWidth}
+         resumeBackupMediaDownload={resumeBackupMediaDownload}
+         pauseBackupMediaDownload={pauseBackupMediaDownload}
+@@ -1095,6 +1097,12 @@ export function SmartPreferences(): JSX.Element | null {
+         selectedSpeaker={selectedSpeaker}
+         sentMediaQualitySetting={sentMediaQualitySetting}
+         setGlobalDefaultConversationColor={setGlobalDefaultConversationColor}
++        onToggleInternalSettings={() => {
++          putItem(
++            'vesperInternalSettings',
++            items.vesperInternalSettings !== true
++          );
++        }}
+         setSettingsLocation={setSettingsLocation}
+         shouldShowUpdateDialog={shouldShowUpdateDialog}
+         showToast={showToast}
+diff --git a/ts/types/StorageKeys.std.ts b/ts/types/StorageKeys.std.ts
+index cf13ce739..539adc6ee 100644
+--- a/ts/types/StorageKeys.std.ts
++++ b/ts/types/StorageKeys.std.ts
+@@ -200,6 +200,7 @@ export type StorageAccessType = {
+   displayBadgesOnProfile: boolean;
+   keepMutedChatsArchived: boolean;
+   vesperKeepDeletedMessages: boolean;
++  vesperInternalSettings: boolean;
+   usernameLastIntegrityCheck: number;
+   usernameCorrupted: boolean;
+   usernameLinkCorrupted: boolean;
+@@ -398,6 +399,7 @@ export const STORAGE_KEYS_TO_PRESERVE_AFTER_UNLINK = [
+   'displayBadgesOnProfile',
+   'keepMutedChatsArchived',
+   'vesperKeepDeletedMessages',
++  'vesperInternalSettings',
+   'hasSetMyStoriesPrivacy',
+   'hasViewedOnboardingStory',
+   'hasKeyTransparencyDisabled',
