@@ -1,4 +1,4 @@
-From 77fd07d925683420fb4a2a265c2687598649a153 Mon Sep 17 00:00:00 2001
+From f3f46a64e5fcb03dcf31847d1092008bac9d0602 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:54:15 +0100
 Subject: [PATCH 03/11] Preserve messages after remote deletion requests
@@ -46,7 +46,7 @@ index e61ad55f4..f7a33a7f6 100644
  
  export const enforceLicenseComments = ESLintUtils.RuleCreator.withoutDocs({
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index bce612436..ce1e5ccf0 100644
+index c3230a8cc..f2cba665d 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
 @@ -8916,6 +8916,30 @@

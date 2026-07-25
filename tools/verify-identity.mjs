@@ -164,6 +164,21 @@ if (!chatRefreshSource.includes("createSupportUrl")) {
   throw new Error("Chat refresh help is not routed through Vesper support");
 }
 
+const englishMessages = await readJson("_locales/en/messages.json");
+for (const [key, expected] of [
+  [
+    "icu:Install__scan-this-code",
+    "Scan this code in the Vesper app on your phone",
+  ],
+  ["icu:Install__instructions__1", "Open Vesper on your phone"],
+]) {
+  expect(
+    englishMessages[key]?.messageformat,
+    expected,
+    `English pairing copy for ${key}`,
+  );
+}
+
 const localeRoot = path.join(checkout, "_locales");
 for (const entry of await readdir(localeRoot, { withFileTypes: true })) {
   if (!entry.isDirectory()) {

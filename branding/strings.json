@@ -17,6 +17,8 @@
   "icu:KeyTransparencyOnboardingDialog__Title": "Vesper can now auto-verify encryption",
   "icu:KeyTransparencyOnboardingDialog__Description": "For contacts you’re connected to by phone number, Vesper can automatically confirm whether the connection is secure using a process called key transparency. For added security, you can still verify connections manually using a QR code or by comparing safety numbers.",
   "icu:ChatRefresh--summary": "Vesper uses end-to-end encryption and may need to refresh your chat session sometimes. This doesn’t affect your chat’s security, but you may have missed a message from this contact and can ask them to resend it.",
+  "icu:Install__scan-this-code": "Scan this code in the Vesper app on your phone",
+  "icu:Install__instructions__1": "Open Vesper on your phone",
   "icu:Install__confirm-data-deletion__body": "You’re attempting to link a different Signal account to this desktop. If you continue, all data currently in Vesper will be deleted.",
   "icu:Preferences__PrivacyPage__KeyTransparency__Description": "When enabled, Vesper will attempt to automatically verify the encryption of one-to-one chats.",
   "icu:installTooOld": "Update Vesper on this device to link your phone.",

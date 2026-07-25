@@ -1,4 +1,4 @@
-From c56786a1eb875352607461fc2b3a24170a4e6133 Mon Sep 17 00:00:00 2001
+From 6eb7ef7a3f1cdf86e5bd8a462c260af4f1c46289 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:59:37 +0100
 Subject: [PATCH 04/11] Add Vesper help and internal settings surfaces
@@ -18,7 +18,7 @@ Adapted from settings and help work by Oscar Mira and other Molly contributors.
  8 files changed, 95 insertions(+), 29 deletions(-)
 
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index ce1e5ccf0..a584464cf 100644
+index f2cba665d..c1fab95ea 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
 @@ -123,6 +123,30 @@
