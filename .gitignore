@@ -1,0 +1,41 @@
+# Materialised Signal checkout
+/work/
+
+# Dependencies, build output and local caches
+/node_modules/
+/release/
+/artifacts/
+/build/
+/.cache/
+__pycache__/
+*.pyc
+*.deb
+*.dmg
+*.AppImage
+*.exe
+*.msi
+*.rpm
+*.sig
+
+# Credentials and signing material
+/.env
+/.env.*
+/.secrets/
+/credentials/
+/secrets/
+*.credentials.json
+*.key
+*.mobileprovision
+*.p12
+*.pem
+*.pfx
+
+# Editor state
+/.idea/
+/.vscode/
+*.swp
+*~
+
+# Platform noise
+.DS_Store
+Thumbs.db
