@@ -1,7 +1,7 @@
 From a350a107feac6f966e6a9e64a9c473060e8976a6 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 20:29:30 +0100
-Subject: [PATCH 8/8] Route Vesper updates and support independently
+Subject: [PATCH 8/9] Route Vesper updates and support independently
 
 ---
  ts/components/DialogExpiredBuild.dom.tsx      | 14 +----

@@ -1,7 +1,7 @@
 From 2fd03f266e0707e5065e6b43c9084154b0ee6e29 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 19:18:41 +0100
-Subject: [PATCH 6/8] Isolate development protocol handlers
+Subject: [PATCH 6/9] Isolate development protocol handlers
 
 Select production or development Vesper schemes from package identity and accept either scheme at the application boundary. Development builds no longer claim production Vesper handlers.
 ---
