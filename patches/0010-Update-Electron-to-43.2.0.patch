@@ -1,7 +1,7 @@
 From 7d6c00258b11877c461e42e2ad61d23a7cb97b22 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 21:09:12 +0100
-Subject: [PATCH 10/11] Update Electron to 43.2.0
+Subject: [PATCH 10/12] Update Electron to 43.2.0
 
 ---
  package.json   |   2 +-

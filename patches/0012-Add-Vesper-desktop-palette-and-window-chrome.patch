@@ -1,0 +1,1828 @@
+From d8797d96571adc281cac720ec59d1df2ee36e351 Mon Sep 17 00:00:00 2001
+From: Vesper Materializer <vesper-materializer@users.noreply.github.com>
+Date: Sun, 26 Jul 2026 13:53:39 +0100
+Subject: [PATCH 12/12] Add Vesper desktop palette and window chrome
+
+---
+ _locales/en/messages.json                     |  20 ++
+ app/main.main.ts                              | 157 ++++++++++++--
+ knip.js                                       |   2 +
+ stylesheets/_mixins.scss                      |  48 ++---
+ stylesheets/_modules.scss                     |   4 +-
+ stylesheets/_variables.scss                   |  44 +++-
+ stylesheets/components/App.scss               |  11 +-
+ stylesheets/components/BrandTheme.scss        |  87 ++++++++
+ stylesheets/components/Checkbox.scss          |  44 ++++
+ stylesheets/components/ProgressBar.scss       |   2 +-
+ stylesheets/components/Select.scss            |  31 ++-
+ stylesheets/components/VesperTitleBar.scss    | 154 ++++++++++++++
+ stylesheets/manifest.scss                     |   2 +
+ ts/axo/_tailwind-theme/colors.css             |  86 +++++++-
+ ts/background.preload.ts                      |   2 +-
+ ts/components/App.dom.tsx                     |   6 +-
+ ts/components/Preferences.dom.stories.tsx     |   2 +
+ ts/components/Preferences.dom.tsx             |  35 +++-
+ ts/components/VesperTitleBar.dom.tsx          | 196 ++++++++++++++++++
+ ts/main/settingsChannel.main.ts               |   2 +
+ ts/state/smart/Preferences.preload.tsx        |  19 +-
+ .../util/vesperDeleteForEveryone_test.std.ts  |   2 +-
+ ts/test-node/util/vesperProtocol_test.std.ts  |   2 +-
+ ts/util/createIPCEvents.preload.ts            |   9 +
+ ts/util/preload.preload.ts                    |   2 +
+ ts/util/theme.std.ts                          |   7 +
+ ts/util/vesperDeleteForEveryone.std.ts        |   2 +-
+ ts/util/vesperProtocol.std.ts                 |  11 +-
+ ts/window.d.ts                                |  19 ++
+ ts/windows/AppProvider.dom.tsx                |  33 ++-
+ ts/windows/applyTheme.dom.ts                  |  14 +-
+ ts/windows/context.preload.ts                 |   1 +
+ ts/windows/main/phase1-ipc.preload.ts         |  18 ++
+ ts/windows/minimalContext.preload.ts          |   1 +
+ ts/windows/preload.preload.ts                 |   1 +
+ 35 files changed, 987 insertions(+), 89 deletions(-)
+ create mode 100644 stylesheets/components/BrandTheme.scss
+ create mode 100644 stylesheets/components/VesperTitleBar.scss
+ create mode 100644 ts/components/VesperTitleBar.dom.tsx
+
+diff --git a/_locales/en/messages.json b/_locales/en/messages.json
+index c1fab95ea..a64b360da 100644
+--- a/_locales/en/messages.json
++++ b/_locales/en/messages.json
+@@ -311,6 +311,14 @@
+     "messageformat": "Minimize",
+     "description": "Window menu command to minimize the current window"
+   },
++  "icu:VesperTitleBar--menu": {
++    "messageformat": "Application menu",
++    "description": "Accessible label for the menus in the custom Vesper titlebar"
++  },
++  "icu:VesperTitleBar--restore": {
++    "messageformat": "Restore",
++    "description": "Accessible label for restoring a maximized Vesper window"
++  },
+   "icu:windowMenuZoom": {
+     "messageformat": "Zoom",
+     "description": "Window menu command to make the current window the size of the whole screen"
+@@ -2453,6 +2461,18 @@
+     "messageformat": "Theme",
+     "description": "Header for theme settings"
+   },
++  "icu:Preferences--colour-palette": {
++    "messageformat": "Colour palette",
++    "description": "Label for choosing between the Vesper and Signal colour palettes"
++  },
++  "icu:Preferences--colour-palette-vesper": {
++    "messageformat": "Vesper",
++    "description": "Option for the Vesper colour palette"
++  },
++  "icu:Preferences--colour-palette-signal": {
++    "messageformat": "Signal",
++    "description": "Option for the Signal colour palette"
++  },
+   "icu:calling": {
+     "messageformat": "Calling",
+     "description": "Header for calling options on the settings screen"
+diff --git a/app/main.main.ts b/app/main.main.ts
+index 17e47e92a..4f386f0f5 100644
+--- a/app/main.main.ts
++++ b/app/main.main.ts
+@@ -380,20 +380,33 @@ type GetBackgroundColorOptionsType = GetThemeSettingOptionsType &
+ const AXO_COLOR_BRAND_LOGO = '#7152ff';
+ const AXO_COLOR_SURFACE_PRIMARY_LIGHT = '#f6f6ff';
+ const AXO_COLOR_SURFACE_PRIMARY_DARK = '#100e1f';
++const SIGNAL_COLOR_SURFACE_PRIMARY_LIGHT = '#fafafa';
++const SIGNAL_COLOR_SURFACE_PRIMARY_DARK = '#191919';
++
++function getBrandThemeSetting(): 'vesper' | 'signal' {
++  const value = ephemeralConfig.get('vesper-brand-theme');
++  return value === 'signal' ? 'signal' : 'vesper';
++}
+ 
+ async function getBackgroundColor(
+   options?: GetBackgroundColorOptionsType
+ ): Promise<string> {
+   const theme = await getResolvedThemeSetting(options);
++  const isSignalTheme = getBrandThemeSetting() === 'signal';
+ 
+   if (theme === 'light') {
+-    return options?.signalColors
+-      ? AXO_COLOR_BRAND_LOGO
++    if (options?.signalColors) {
++      return AXO_COLOR_BRAND_LOGO;
++    }
++    return isSignalTheme
++      ? SIGNAL_COLOR_SURFACE_PRIMARY_LIGHT
+       : AXO_COLOR_SURFACE_PRIMARY_LIGHT;
+   }
+ 
+   if (theme === 'dark') {
+-    return AXO_COLOR_SURFACE_PRIMARY_DARK;
++    return isSignalTheme
++      ? SIGNAL_COLOR_SURFACE_PRIMARY_DARK
++      : AXO_COLOR_SURFACE_PRIMARY_DARK;
+   }
+ 
+   throw missingCaseError(theme);
+@@ -459,6 +472,8 @@ if (windowConfigParsed.success) {
+   windowConfig = windowConfigParsed.data;
+ }
+ 
++let customTitleBarMenuVisible = false;
++
+ if (windowFromUserConfig) {
+   userConfig.set('window', null);
+   ephemeralConfig.set('window', windowConfig);
+@@ -652,10 +667,8 @@ if (OS.isWindows()) {
+   windowIcon = join(rootDir, 'build', 'icons', 'png', '512x512.png');
+ }
+ 
+-// The titlebar is hidden on:
+-//   - Windows < 10 (7, 8)
+-//   - macOS (but no custom titlebar is displayed, see
+-//     `--title-bar-drag-area-height` in `stylesheets/_titlebar.scss`
++// macOS keeps its native traffic lights. Windows and Linux use Vesper's
++// renderer-owned titlebar.
+ const mainTitleBarStyle = OS.isMacOS()
+   ? ('hidden' as const)
+   : ('default' as const);
+@@ -726,8 +739,8 @@ async function createWindow() {
+     height,
+     minWidth: MIN_WIDTH,
+     minHeight: MIN_HEIGHT,
+-    autoHideMenuBar: false,
+-    titleBarStyle: mainTitleBarStyle,
++    autoHideMenuBar: true,
++    ...(OS.isMacOS() ? { titleBarStyle: mainTitleBarStyle } : { frame: false }),
+     backgroundColor,
+     webPreferences: {
+       ...defaultWebPrefs,
+@@ -741,7 +754,7 @@ async function createWindow() {
+       spellcheck,
+     },
+     icon: windowIcon,
+-    ...pick(windowConfig, ['autoHideMenuBar', 'x', 'y']),
++    ...pick(windowConfig, ['x', 'y']),
+   };
+ 
+   if (!isNumber(windowOptions.width) || windowOptions.width < MIN_WIDTH) {
+@@ -828,7 +841,7 @@ async function createWindow() {
+ 
+     const newWindowConfig = {
+       maximized: mainWindow.isMaximized(),
+-      autoHideMenuBar: mainWindow.autoHideMenuBar,
++      autoHideMenuBar: !customTitleBarMenuVisible,
+       fullscreen: mainWindow.isFullScreen(),
+       // oxlint-disable-next-line typescript/no-non-null-assertion
+       width: size[0]!,
+@@ -2451,6 +2464,10 @@ function setupMenu(options?: Partial<CreateTemplateOptionsType>) {
+   );
+   const menu = Menu.buildFromTemplate(template);
+   Menu.setApplicationMenu(menu);
++  if (mainWindow && !OS.isMacOS()) {
++    mainWindow.autoHideMenuBar = true;
++    mainWindow.setMenuBarVisibility(false);
++  }
+ 
+   mainWindow?.webContents.send('window:set-menu-options', {
+     development: menuOptions.development,
+@@ -2721,7 +2738,15 @@ ipc.on('shutdown', () => {
+ ipc.on(
+   'set-auto-hide-menu-bar',
+   (_event: Electron.Event, autoHide: boolean) => {
+-    if (mainWindow) {
++    customTitleBarMenuVisible = !autoHide;
++    if (mainWindow && !OS.isMacOS()) {
++      mainWindow.autoHideMenuBar = true;
++      mainWindow.setMenuBarVisibility(false);
++      mainWindow.webContents.send(
++        'titlebar:set-menu-visibility',
++        customTitleBarMenuVisible
++      );
++    } else if (mainWindow) {
+       mainWindow.autoHideMenuBar = autoHide;
+     }
+   }
+@@ -2730,7 +2755,14 @@ ipc.on(
+ ipc.on(
+   'set-menu-bar-visibility',
+   (_event: Electron.Event, visibility: boolean) => {
+-    if (mainWindow) {
++    customTitleBarMenuVisible = visibility;
++    if (mainWindow && !OS.isMacOS()) {
++      mainWindow.setMenuBarVisibility(false);
++      mainWindow.webContents.send(
++        'titlebar:set-menu-visibility',
++        customTitleBarMenuVisible
++      );
++    } else if (mainWindow) {
+       mainWindow.setMenuBarVisibility(visibility);
+     }
+   }
+@@ -3017,6 +3049,18 @@ const onEphemeralSettingChanged = (name: string) => {
+     return;
+   }
+ 
++  if (name === 'brandTheme') {
++    drop(
++      (async () => {
++        const backgroundColor = await getBackgroundColor();
++        for (const window of activeWindows) {
++          window.setBackgroundColor(backgroundColor);
++        }
++      })()
++    );
++    return;
++  }
++
+   if (name !== 'contentProtection') {
+     return;
+   }
+@@ -3364,6 +3408,93 @@ ipc.handle('getMainWindowStats', async () => {
+   };
+ });
+ 
++ipc.handle('titlebar:get-state', ({ sender }) => {
++  const senderWindow = BrowserWindow.fromWebContents(sender);
++  if (!senderWindow || senderWindow !== mainWindow || OS.isMacOS()) {
++    return {
++      isCustomTitleBar: false,
++      menuItems: [],
++      menuVisible: false,
++    };
++  }
++
++  const menu = Menu.getApplicationMenu();
++  const menuItems =
++    menu?.items.flatMap((item, index) =>
++      item.submenu
++        ? [
++            {
++              index,
++              label: item.label.replaceAll('&', ''),
++            },
++          ]
++        : []
++    ) ?? [];
++
++  return {
++    isCustomTitleBar: true,
++    menuItems,
++    menuVisible: customTitleBarMenuVisible,
++  };
++});
++
++ipc.handle(
++  'titlebar:popup-menu',
++  ({ sender }, untrustedIndex, untrustedX, untrustedY) => {
++    const senderWindow = BrowserWindow.fromWebContents(sender);
++    if (!senderWindow || senderWindow !== mainWindow || OS.isMacOS()) {
++      return;
++    }
++
++    if (
++      !Number.isInteger(untrustedIndex) ||
++      !Number.isFinite(untrustedX) ||
++      !Number.isFinite(untrustedY)
++    ) {
++      return;
++    }
++
++    const menuItem = Menu.getApplicationMenu()?.items[untrustedIndex];
++    if (!menuItem?.submenu) {
++      return;
++    }
++
++    const { width, height } = senderWindow.getContentBounds();
++    const x = Math.max(0, Math.min(Math.floor(untrustedX), width));
++    const y = Math.max(0, Math.min(Math.floor(untrustedY), height));
++
++    return new Promise<void>(resolve => {
++      menuItem.submenu?.popup({
++        window: senderWindow,
++        x,
++        y,
++        callback: resolve,
++      });
++    });
++  }
++);
++
++ipc.handle('titlebar:window-action', ({ sender }, action) => {
++  const senderWindow = BrowserWindow.fromWebContents(sender);
++  if (!senderWindow || senderWindow !== mainWindow || OS.isMacOS()) {
++    return;
++  }
++
++  switch (action) {
++    case 'minimize':
++      senderWindow.minimize();
++      break;
++    case 'toggle-maximize':
++      toggleMaximizedBrowserWindow(senderWindow);
++      break;
++    case 'close':
++      senderWindow.close();
++      break;
++    default:
++      break;
++  }
++});
++
+ ipc.handle('getMenuOptions', async () => {
+   return {
+     development: menuOptions?.development ?? false,
+diff --git a/knip.js b/knip.js
+index 80ae300e7..bd8ec646c 100644
+--- a/knip.js
++++ b/knip.js
+@@ -44,6 +44,8 @@ const config = {
+         // Others
+         'codemods/**/*.mjs',
+         'scripts/**/*.mjs',
++        'ts/updater/signVesperUpdate.node.ts',
++        'ts/updater/verifyVesperUpdate.node.ts',
+       ],
+       project: [
+         // Production
+diff --git a/stylesheets/_mixins.scss b/stylesheets/_mixins.scss
+index 8aaac09f4..95cdd2422 100644
+--- a/stylesheets/_mixins.scss
++++ b/stylesheets/_mixins.scss
+@@ -441,18 +441,18 @@ $rtl-icon-map: (
+ 
+   &:hover {
+     @include mouse-mode {
+-      background-color: color.mix(
+-        variables.$color-black,
+-        variables.$color-ultramarine,
+-        15%
++      background-color: color-mix(
++        in srgb,
++        variables.$color-black 15%,
++        variables.$color-ultramarine
+       );
+     }
+ 
+     @include dark-mouse-mode {
+-      background-color: color.mix(
+-        variables.$color-white,
+-        variables.$color-ultramarine,
+-        15%
++      background-color: color-mix(
++        in srgb,
++        variables.$color-white 15%,
++        variables.$color-ultramarine
+       );
+     }
+   }
+@@ -461,32 +461,32 @@ $rtl-icon-map: (
+     // We need to include all four here for specificity precedence
+ 
+     @include mouse-mode {
+-      background-color: color.mix(
+-        variables.$color-black,
+-        variables.$color-ultramarine,
+-        25%
++      background-color: color-mix(
++        in srgb,
++        variables.$color-black 25%,
++        variables.$color-ultramarine
+       );
+     }
+     @include dark-mouse-mode {
+-      background-color: color.mix(
+-        variables.$color-white,
+-        variables.$color-ultramarine,
+-        25%
++      background-color: color-mix(
++        in srgb,
++        variables.$color-white 25%,
++        variables.$color-ultramarine
+       );
+     }
+ 
+     @include keyboard-mode {
+-      background-color: color.mix(
+-        variables.$color-black,
+-        variables.$color-ultramarine,
+-        25%
++      background-color: color-mix(
++        in srgb,
++        variables.$color-black 25%,
++        variables.$color-ultramarine
+       );
+     }
+     @include dark-keyboard-mode {
+-      background-color: color.mix(
+-        variables.$color-black,
+-        variables.$color-ultramarine,
+-        25%
++      background-color: color-mix(
++        in srgb,
++        variables.$color-black 25%,
++        variables.$color-ultramarine
+       );
+     }
+   }
+diff --git a/stylesheets/_modules.scss b/stylesheets/_modules.scss
+index a3ae2797e..3e258ecbf 100644
+--- a/stylesheets/_modules.scss
++++ b/stylesheets/_modules.scss
+@@ -388,7 +388,7 @@ $message-padding-horizontal: 12px;
+ }
+ 
+ .module-message__wrapper--selected {
+-  background: rgba(variables.$color-ultramarine, 8%);
++  background: rgb(from variables.$color-ultramarine r g b / 8%);
+ }
+ 
+ .module-message__select-checkbox {
+@@ -6365,7 +6365,7 @@ button.module-calling-participants-list__contact {
+ }
+ .module-message__action--incoming--in-another-call {
+   @include mixins.light-theme {
+-    color: rgba(variables.$color-link, 0.5);
++    color: rgb(from variables.$color-link r g b / 50%);
+   }
+   @include mixins.dark-theme {
+     color: rgba(variables.$color-white, 0.5);
+diff --git a/stylesheets/_variables.scss b/stylesheets/_variables.scss
+index 96231c312..96dcb6008 100644
+--- a/stylesheets/_variables.scss
++++ b/stylesheets/_variables.scss
+@@ -24,7 +24,31 @@ $monospace:
+ 
+ // -- V3 Colors
+ 
+-$color-accent-blue: #7152ff;
++:root {
++  --vesper-color-accent-blue: #7152ff;
++  --vesper-color-ultramarine-dark: #3e24b4;
++  --vesper-color-ultramarine-logo: #7152ff;
++  --vesper-color-ultramarine-light: #aa98ff;
++  --vesper-color-ultramarine-dawn: #5335dd;
++  --vesper-color-ultramarine-pastel: #c8bdff;
++  --vesper-color-ultramarine-pale: #e5dfff;
++  --vesper-color-ultramarine: #7152ff;
++  --vesper-color-link: #5335dd;
++}
++
++body.signal-brand-theme {
++  --vesper-color-accent-blue: #2c6bed;
++  --vesper-color-ultramarine-dark: #1851b4;
++  --vesper-color-ultramarine-logo: #3b45fd;
++  --vesper-color-ultramarine-light: #6191f3;
++  --vesper-color-ultramarine-dawn: #406ec9;
++  --vesper-color-ultramarine-pastel: #abc4f8;
++  --vesper-color-ultramarine-pale: #d2dffb;
++  --vesper-color-ultramarine: #2c6bed;
++  --vesper-color-link: #315ff4;
++}
++
++$color-accent-blue: var(--vesper-color-accent-blue);
+ $color-accent-green: #4caf50;
+ $color-accent-red: #f44336;
+ $color-accent-yellow: #ffd624;
+@@ -87,14 +111,14 @@ $color-black-alpha-90: rgba($color-black, 0.9);
+ 
+ $color-transparent: rgba(0, 0, 0, 0);
+ 
+-$color-ultramarine-dark: #3e24b4;
+-$color-ultramarine-logo: #7152ff;
+-$color-ultramarine-light: #aa98ff;
+-$color-ultramarine-dawn: #5335dd;
+-$color-ultramarine-pastel: #c8bdff;
+-$color-ultramarine-pale: #e5dfff;
+-$color-ultramarine: #7152ff;
+-$color-link: #5335dd;
++$color-ultramarine-dark: var(--vesper-color-ultramarine-dark);
++$color-ultramarine-logo: var(--vesper-color-ultramarine-logo);
++$color-ultramarine-light: var(--vesper-color-ultramarine-light);
++$color-ultramarine-dawn: var(--vesper-color-ultramarine-dawn);
++$color-ultramarine-pastel: var(--vesper-color-ultramarine-pastel);
++$color-ultramarine-pale: var(--vesper-color-ultramarine-pale);
++$color-ultramarine: var(--vesper-color-ultramarine);
++$color-link: var(--vesper-color-link);
+ 
+ // Flat colors
+ 
+@@ -119,7 +143,7 @@ $color-orange: #ff9500;
+ $color-ultramarine-gradient: (
+   deg: 180deg,
+   start: #8d75ff,
+-  end: $color-ultramarine,
++  end: #7152ff,
+ );
+ $color-basil: (
+   deg: 180deg,
+diff --git a/stylesheets/components/App.scss b/stylesheets/components/App.scss
+index 89a9d9f0b..e3efbeea7 100644
+--- a/stylesheets/components/App.scss
++++ b/stylesheets/components/App.scss
+@@ -4,10 +4,15 @@
+ @use '../variables';
+ 
+ .App {
++  display: flex;
++  flex-direction: column;
+   height: 100%;
+   position: relative;
+ 
+-  // TitleBar support
+-  display: flex;
+-  flex-direction: column;
++  &__content {
++    flex: 1 1 auto;
++    min-height: 0;
++    overflow: hidden;
++    position: relative;
++  }
+ }
+diff --git a/stylesheets/components/BrandTheme.scss b/stylesheets/components/BrandTheme.scss
+new file mode 100644
+index 000000000..e03009bca
+--- /dev/null
++++ b/stylesheets/components/BrandTheme.scss
+@@ -0,0 +1,87 @@
++// Copyright 2026 Signal Messenger, LLC
++// SPDX-License-Identifier: AGPL-3.0-only
++
++@use 'sass:color';
++
++$vesper-indigo: #6448e5;
++$signal-ultramarine-start: #0552f0;
++$signal-ultramarine-end: #2c6bed;
++
++body.vesper-brand-theme {
++  .module-message__container--outgoing-indigo,
++  .ConversationDetails__chat-color--indigo,
++  .ChatColorPicker__bubble--indigo,
++  .GradientDial__knob--indigo,
++  .CustomColorEditor__gradient-knob--indigo {
++    background-color: $vesper-indigo;
++  }
++
++  .module-quote--incoming-indigo,
++  .module-quote--compose-indigo {
++    .module-quote__primary {
++      border-inline-start-color: $vesper-indigo;
++    }
++  }
++}
++
++body.light-theme.vesper-brand-theme {
++  .module-quote--incoming-indigo,
++  .module-quote--outgoing-indigo,
++  .module-quote--compose-indigo {
++    background-color: color.scale($vesper-indigo, $lightness: 60%);
++  }
++}
++
++body.dark-theme.vesper-brand-theme {
++  .module-quote--incoming-indigo,
++  .module-quote--outgoing-indigo,
++  .module-quote--compose-indigo {
++    background-color: color.scale($vesper-indigo, $lightness: -40%);
++  }
++}
++
++body.signal-brand-theme {
++  .module-message__container--outgoing-ultramarine,
++  .ConversationDetails__chat-color--ultramarine,
++  .ChatColorPicker__bubble--ultramarine,
++  .GradientDial__knob--ultramarine,
++  .CustomColorEditor__gradient-knob--ultramarine {
++    background-image: linear-gradient(
++      180deg,
++      $signal-ultramarine-start,
++      $signal-ultramarine-end
++    );
++  }
++
++  .module-quote--compose-ultramarine,
++  .module-quote--incoming-ultramarine {
++    .module-quote__primary,
++    &.module-quote__reference-warning {
++      border-inline-start-color: $signal-ultramarine-start;
++    }
++  }
++}
++
++body.light-theme.signal-brand-theme {
++  .module-quote--compose-ultramarine,
++  .module-quote--incoming-ultramarine,
++  .module-quote--outgoing-ultramarine {
++    background-image: linear-gradient(
++      180deg,
++      color.scale($signal-ultramarine-start, $lightness: 60%),
++      color.scale($signal-ultramarine-end, $lightness: 60%)
++    );
++  }
++}
++
++body.dark-theme.signal-brand-theme {
++  .module-quote--compose-ultramarine,
++  .module-quote--incoming-ultramarine,
++  .module-quote--outgoing-ultramarine {
++    background-image: linear-gradient(
++      180deg,
++      color.scale($signal-ultramarine-start, $lightness: -40%),
++      color.scale($signal-ultramarine-end, $lightness: -40%)
++    );
++  }
++}
+diff --git a/stylesheets/components/Checkbox.scss b/stylesheets/components/Checkbox.scss
+index 6c2decf2f..f5b70fb07 100644
+--- a/stylesheets/components/Checkbox.scss
++++ b/stylesheets/components/Checkbox.scss
+@@ -10,9 +10,53 @@
+     display: flex;
+ 
+     input {
++      appearance: none;
++      background-color: var(--axo-color-fill-control);
++      border: 1.5px solid var(--axo-color-border-tertiary);
++      border-radius: 3px;
++      cursor: pointer;
+       height: 18px;
++      margin: 0;
++      position: relative;
++      transition:
++        background-color 100ms ease,
++        border-color 100ms ease;
+       width: 18px;
+ 
++      &::after {
++        background-color: var(--axo-color-label-primary-oncolor);
++        content: '';
++        inset: 1px;
++        mask: url('../images/icons/v3/check/check-compact-bold.svg') center /
++          14px no-repeat;
++        opacity: 0;
++        position: absolute;
++      }
++
++      &:checked {
++        background-color: var(--axo-color-fill-accent);
++        border-color: var(--axo-color-fill-accent);
++
++        &::after {
++          opacity: 1;
++        }
++      }
++
++      &[type='radio'] {
++        border-radius: 50%;
++
++        &::after {
++          border-radius: 50%;
++          inset: 4px;
++          mask: none;
++        }
++      }
++
++      &:disabled {
++        cursor: default;
++        opacity: 0.45;
++      }
++
+       &:focus {
+         outline: none;
+         @include mixins.keyboard-mode {
+diff --git a/stylesheets/components/ProgressBar.scss b/stylesheets/components/ProgressBar.scss
+index d5545667f..b0a480c65 100644
+--- a/stylesheets/components/ProgressBar.scss
++++ b/stylesheets/components/ProgressBar.scss
+@@ -6,7 +6,7 @@
+ .ProgressBar {
+   position: relative;
+   overflow: hidden;
+-  background: rgba(variables.$color-ultramarine, 0.2);
++  background: rgb(from variables.$color-ultramarine r g b / 20%);
+   height: 5px;
+   border-radius: 2px;
+ }
+diff --git a/stylesheets/components/Select.scss b/stylesheets/components/Select.scss
+index c8d2cc464..ffb275a92 100644
+--- a/stylesheets/components/Select.scss
++++ b/stylesheets/components/Select.scss
+@@ -20,17 +20,19 @@
+     padding-inline: 12px 32px;
+     text-overflow: ellipsis;
+     width: 100%;
+-    color: variables.$color-black;
++    background-color: var(--axo-color-surface-secondary);
++    border-color: var(--axo-color-border-tertiary);
++    color: var(--axo-color-label-primary);
+ 
+-    @include mixins.dark-theme {
+-      background-color: variables.$color-gray-90;
+-      border-color: variables.$color-gray-60;
+-      color: variables.$color-gray-05;
++    &:disabled {
++      color: var(--axo-color-label-disabled);
++      cursor: default;
++      opacity: 0.7;
+     }
+ 
+     @include mixins.keyboard-mode {
+       &:focus {
+-        border: 3px solid variables.$color-ultramarine;
++        border: 3px solid var(--axo-color-border-selected);
+         line-height: 14px;
+         padding-inline-start: 10px;
+       }
+@@ -46,18 +48,9 @@
+     inset-inline-end: 8px;
+     top: 11px;
+     width: 16px;
+-    @include mixins.light-theme {
+-      @include mixins.color-svg(
+-        '../images/icons/v3/dropdown/dropdown-compact-light.svg',
+-        variables.$color-gray-60
+-      );
+-    }
+-
+-    @include mixins.dark-theme {
+-      @include mixins.color-svg(
+-        '../images/icons/v3/dropdown/dropdown-compact-light.svg',
+-        variables.$color-gray-15
+-      );
+-    }
++    @include mixins.color-svg(
++      '../images/icons/v3/dropdown/dropdown-compact-light.svg',
++      var(--axo-color-label-secondary)
++    );
+   }
+ }
+diff --git a/stylesheets/components/VesperTitleBar.scss b/stylesheets/components/VesperTitleBar.scss
+new file mode 100644
+index 000000000..717a84bb5
+--- /dev/null
++++ b/stylesheets/components/VesperTitleBar.scss
+@@ -0,0 +1,154 @@
++// Copyright 2026 Signal Messenger, LLC
++// SPDX-License-Identifier: AGPL-3.0-only
++
++.VesperTitleBar {
++  align-items: stretch;
++  background: var(--axo-color-surface-primary);
++  border-block-end: 1px solid var(--axo-color-border-primary);
++  color: var(--axo-color-label-primary);
++  display: flex;
++  flex: 0 0 40px;
++  height: 40px;
++  user-select: none;
++  z-index: 10;
++
++  button {
++    -webkit-app-region: no-drag;
++  }
++
++  &__identity {
++    align-items: center;
++    display: flex;
++    flex: 0 0 102px;
++    font-size: 13px;
++    font-weight: 600;
++    gap: 7px;
++    letter-spacing: 0.01em;
++    padding-inline: 12px 8px;
++  }
++
++  &__logo {
++    height: 18px;
++    width: 18px;
++  }
++
++  &__menus {
++    align-items: stretch;
++    display: flex;
++    flex: 0 0 270px;
++    visibility: visible;
++
++    &[aria-hidden='true'] {
++      visibility: hidden;
++    }
++  }
++
++  &__menu,
++  &__control {
++    background: transparent;
++    border: 0;
++    color: inherit;
++    font: inherit;
++    margin: 0;
++    outline: 0;
++  }
++
++  &__menu {
++    border-radius: 5px;
++    font-size: 13px;
++    margin-block: 5px;
++    padding-inline: 8px;
++
++    &:hover,
++    &:focus-visible,
++    &[data-open='true'] {
++      background: var(--axo-color-fill-primary);
++    }
++
++    &:focus-visible {
++      box-shadow: inset 0 0 0 1px var(--axo-color-border-selected);
++    }
++  }
++
++  &__drag-space {
++    flex: 1 1 auto;
++    min-width: 12px;
++  }
++
++  &__controls {
++    display: flex;
++    flex: 0 0 138px;
++  }
++
++  &__control {
++    align-items: center;
++    display: flex;
++    height: 39px;
++    justify-content: center;
++    position: relative;
++    width: 46px;
++
++    &:hover,
++    &:focus-visible {
++      background: var(--axo-color-fill-primary);
++    }
++
++    &::before,
++    &::after {
++      box-sizing: border-box;
++      content: '';
++      position: absolute;
++    }
++
++    &--minimize::before {
++      background: currentColor;
++      height: 1px;
++      width: 10px;
++    }
++
++    &--maximize::before {
++      border: 1px solid currentColor;
++      height: 10px;
++      width: 10px;
++    }
++
++    &--restore::before,
++    &--restore::after {
++      border: 1px solid currentColor;
++      height: 8px;
++      width: 9px;
++    }
++
++    &--restore::before {
++      inset-block-start: 13px;
++      inset-inline-start: 20px;
++    }
++
++    &--restore::after {
++      background: var(--axo-color-surface-primary);
++      inset-block-start: 17px;
++      inset-inline-start: 16px;
++    }
++
++    &--close:hover,
++    &--close:focus-visible {
++      background: #c42b1c;
++      color: #fff;
++    }
++
++    &--close::before,
++    &--close::after {
++      background: currentColor;
++      height: 1px;
++      width: 12px;
++    }
++
++    &--close::before {
++      rotate: 45deg;
++    }
++
++    &--close::after {
++      rotate: -45deg;
++    }
++  }
++}
+diff --git a/stylesheets/manifest.scss b/stylesheets/manifest.scss
+index cfa229149..0b661fcf1 100644
+--- a/stylesheets/manifest.scss
++++ b/stylesheets/manifest.scss
+@@ -36,6 +36,7 @@ $is-storybook: false !default;
+ @use 'components/BadgeCarouselIndex.scss';
+ @use 'components/BadgeDialog.scss';
+ @use 'components/BetterAvatarBubble.scss';
++@use 'components/BrandTheme.scss';
+ @use 'components/Button.scss';
+ @use 'components/CallsTab.scss';
+ @use 'components/CallingAdhocCallInfo.scss';
+@@ -185,4 +186,5 @@ $is-storybook: false !default;
+ @use 'components/UsernameEditor.scss';
+ @use 'components/UsernameLinkEditor.scss';
+ @use 'components/UsernameMegaphone.scss';
++@use 'components/VesperTitleBar.scss';
+ @use 'components/WhatsNew.scss';
+diff --git a/ts/axo/_tailwind-theme/colors.css b/ts/axo/_tailwind-theme/colors.css
+index 4e5974eda..571d36171 100644
+--- a/ts/axo/_tailwind-theme/colors.css
++++ b/ts/axo/_tailwind-theme/colors.css
+@@ -189,7 +189,7 @@
+   --axo-color-surface-tertiary:         light-dark(#eeeaff, #1e1645);
+   --axo-color-surface-quaternary:       light-dark(#eae5ff, #231a4e);
+   --axo-color-surface-card:             light-dark(#ffffff, #281e57);
+-  --axo-color-surface-message-incoming: light-dark(#eeeaff, #281e57);
++  --axo-color-surface-message-incoming: light-dark(#eeeaff, #231a4e);
+   --axo-color-surface-message-outgoing: light-dark(#7152ff, #5335dd);
+ }
+ 
+@@ -530,3 +530,87 @@
+   --axo-color-legacy-signal-chat-message-bg:   light-dark(#8889B4, #444664);
+   --axo-color-legacy-warning-badge:            light-dark(#C84118, #EB977D);
+ }
++
++/**
++ * Signal palette
++ * ----------------------------------------------------------------------------
++ * Keep Signal's upstream desktop palette available as an appearance choice.
++ */
++
++/* prettier-ignore */
++@layer theme {
++  body.signal-brand-theme {
++    --axo-color-brand-primary: #3b45fd;
++    --axo-color-label-accent:               light-dark(#030ffc, #99a1ff);
++    --axo-color-label-accent-disabled:      light-dark(--alpha(#030ffc / 25%), --alpha(#99a1ff / 25%));
++    --axo-color-label-destructive:          light-dark(#f21602, #ff4a3a);
++    --axo-color-label-destructive-disabled: light-dark(--alpha(#f21602 / 25%), --alpha(#ff4a3a / 25%));
++
++    --axo-color-surface-primary:          light-dark(#fafafa, #191919);
++    --axo-color-surface-secondary:        light-dark(#f5f5f5, #1e1e1e);
++    --axo-color-surface-tertiary:         light-dark(#f0f0f0, #282828);
++    --axo-color-surface-quaternary:       light-dark(#e6e6e6, #373737);
++    --axo-color-surface-card:             light-dark(#ffffff, --alpha(#969696 / 8%));
++    --axo-color-surface-message-incoming: light-dark(#ebebeb, #323232);
++    --axo-color-surface-message-outgoing: light-dark(#2267f5, #2267f5);
++
++    --axo-color-material-primary:            light-dark(--alpha(#fafafa / 90%), --alpha(#191919 / 90%));
++    --axo-color-material-secondary:          light-dark(--alpha(#f4f4f4 / 90%), --alpha(#1f1f1f / 90%));
++    --axo-color-material-tertiary:           light-dark(--alpha(#efefef / 90%), --alpha(#2a2a2a / 90%));
++    --axo-color-material-tertiary-pressed:   light-dark(--alpha(#e9e9e9 / 90%), --alpha(#2f2f2f / 90%));
++    --axo-color-material-quaternary:         light-dark(--alpha(#e4e4e4 / 90%), --alpha(#353535 / 90%));
++    --axo-color-material-quaternary-pressed: light-dark(--alpha(#dedede / 90%), --alpha(#3a3a3a / 90%));
++    --axo-color-material-dialog:             light-dark(--alpha(#fafafa / 90%), --alpha(#353535 / 90%));
++
++    --axo-color-fill-accent:                     light-dark(#4655ff, #5563ff);
++    --axo-color-fill-accent-pressed:             light-dark(#3b4af4, #616eff);
++    --axo-color-fill-accent-bright:              light-dark(#b2b9ff, #b2b9ff);
++    --axo-color-fill-accent-bright-pressed:      light-dark(#a8b0ff, #a8b0ff);
++    --axo-color-fill-accent-tint:                light-dark(--alpha(#030ffc / 6%), --alpha(#99a1ff / 12%));
++    --axo-color-fill-accent-tint-pressed:        light-dark(--alpha(#030ffc / 10%), --alpha(#99a1ff / 16%));
++    --axo-color-fill-destructive:                light-dark(#f21c0d, #ee382c);
++    --axo-color-fill-destructive-pressed:        light-dark(#e41a0c, #ef493e);
++    --axo-color-fill-destructive-tint:           light-dark(--alpha(#f21602 / 6%), --alpha(#ff4a3a / 12%));
++    --axo-color-fill-destructive-tint-pressed:   light-dark(--alpha(#f21602 / 10%), --alpha(#ff4a3a / 16%));
++
++    --axo-color-border-selected: light-dark(#4655ff, #c9ceff);
++  }
++
++  @media (prefers-contrast: more) {
++    body.signal-brand-theme {
++      --axo-color-label-accent:               light-dark(#000cf3, #b6bcff);
++      --axo-color-label-accent-disabled:      light-dark(--alpha(#000cf3 / 40%), --alpha(#b6bcff / 40%));
++      --axo-color-label-destructive:          light-dark(#a20d00, #ff9e99);
++      --axo-color-label-destructive-disabled: light-dark(--alpha(#a20d00 / 40%), --alpha(#ff9e99 / 40%));
++
++      --axo-color-surface-primary:          light-dark(#fafafa, #191919);
++      --axo-color-surface-secondary:        light-dark(#f5f5f5, #1e1e1e);
++      --axo-color-surface-tertiary:         light-dark(#f0f0f0, #282828);
++      --axo-color-surface-quaternary:       light-dark(#e6e6e6, #373737);
++      --axo-color-surface-card:             light-dark(#ffffff, --alpha(#969696 / 8%));
++      --axo-color-surface-message-incoming: light-dark(#e1e1e1, #3c3c3c);
++      --axo-color-surface-message-outgoing: light-dark(#0842b9, #0842b9);
++
++      --axo-color-material-primary:            light-dark(#fafafa, #191919);
++      --axo-color-material-secondary:          light-dark(#f5f5f5, #1e1e1e);
++      --axo-color-material-tertiary:           light-dark(#f0f0f0, #282828);
++      --axo-color-material-tertiary-pressed:   light-dark(#ebebeb, #2d2d2d);
++      --axo-color-material-quaternary:         light-dark(#e6e6e6, #323232);
++      --axo-color-material-quaternary-pressed: light-dark(#e1e1e1, #373737);
++      --axo-color-material-dialog:             light-dark(#fafafa, #323232);
++
++      --axo-color-fill-accent:                     light-dark(#1f31ff, #2536f9);
++      --axo-color-fill-accent-pressed:             light-dark(#0519ff, #2e3ffa);
++      --axo-color-fill-accent-bright:              light-dark(#b2b9ff, #b2b9ff);
++      --axo-color-fill-accent-bright-pressed:      light-dark(#a8b0ff, #a8b0ff);
++      --axo-color-fill-accent-tint:                light-dark(--alpha(#030ffc / 10%), --alpha(#99a1ff / 18%));
++      --axo-color-fill-accent-tint-pressed:        light-dark(--alpha(#030ffc / 14%), --alpha(#99a1ff / 22%));
++      --axo-color-fill-destructive:                light-dark(#b80c00, #b80c00);
++      --axo-color-fill-destructive-pressed:        light-dark(#a80b00, #c20d00);
++      --axo-color-fill-destructive-tint:           light-dark(--alpha(#d91304 / 12%), --alpha(#ff4a3a / 20%));
++      --axo-color-fill-destructive-tint-pressed:   light-dark(--alpha(#d91304 / 16%), --alpha(#ff4a3a / 24%));
++
++      --axo-color-border-selected: light-dark(#3243ff, #c9ceff);
++    }
++  }
++}
+diff --git a/ts/background.preload.ts b/ts/background.preload.ts
+index 44eec1896..1aa1f8e1a 100644
+--- a/ts/background.preload.ts
++++ b/ts/background.preload.ts
+@@ -1523,7 +1523,7 @@ async function startApp(): Promise<void> {
+     const appContainer = document.getElementById('app-container');
+     strictAssert(appContainer != null, 'No #app-container');
+     createRoot(appContainer).render(createAppRoot(window.reduxStore));
+-    const hideMenuBar = itemStorage.get('hide-menu-bar', false);
++    const hideMenuBar = itemStorage.get('hide-menu-bar', true);
+     window.IPC.setAutoHideMenuBar(hideMenuBar);
+     window.IPC.setMenuBarVisibility(!hideMenuBar);
+ 
+diff --git a/ts/components/App.dom.tsx b/ts/components/App.dom.tsx
+index 4278351a0..eac660f2a 100644
+--- a/ts/components/App.dom.tsx
++++ b/ts/components/App.dom.tsx
+@@ -7,6 +7,7 @@ import { AppViewType } from '../types/app.std.ts';
+ import { missingCaseError } from '../util/missingCaseError.std.ts';
+ import { usePageVisibility } from '../hooks/usePageVisibility.dom.ts';
+ import { TitlebarDragArea } from './TitlebarDragArea.dom.tsx';
++import { VesperTitleBar } from './VesperTitleBar.dom.tsx';
+ import { ThemeType } from '../types/Util.std.ts';
+ 
+ import type { ViewStoryActionCreatorType } from '../state/ducks/stories.preload.ts';
+@@ -104,7 +105,10 @@ export function App({
+ 
+   return (
+     <div className="App">
+-      {contents}
++      {!isFullScreen && osClassName !== 'os-macos' && (
++        <VesperTitleBar isMaximized={isMaximized} />
++      )}
++      <div className="App__content">{contents}</div>
+       {renderGlobalModalContainer()}
+       {renderCallManager()}
+       {renderLightbox()}
+diff --git a/ts/components/Preferences.dom.stories.tsx b/ts/components/Preferences.dom.stories.tsx
+index 9bf1cc4ef..87db437bb 100644
+--- a/ts/components/Preferences.dom.stories.tsx
++++ b/ts/components/Preferences.dom.stories.tsx
+@@ -532,6 +532,7 @@ export default {
+     selectedSpeaker: availableSpeakers[1],
+     sentMediaQualitySetting: 'standard',
+     shouldShowUpdateDialog: false,
++    brandTheme: 'vesper',
+     themeSetting: 'system',
+     theme: ThemeType.light,
+     universalExpireTimer: DurationInSeconds.HOUR,
+@@ -636,6 +637,7 @@ export default {
+     onSpellCheckChange: action('onSpellCheckChange'),
+     onStartUpdate: action('onStartUpdate'),
+     onTextFormattingChange: action('onTextFormattingChange'),
++    onBrandThemeChange: action('onBrandThemeChange'),
+     onThemeChange: action('onThemeChange'),
+     onToggleNavTabsCollapse: action('onToggleNavTabsCollapse'),
+     onTypingIndicatorsChange: action('onTypingIndicatorsChange'),
+diff --git a/ts/components/Preferences.dom.tsx b/ts/components/Preferences.dom.tsx
+index 85a467ba7..6e937ecdf 100644
+--- a/ts/components/Preferences.dom.tsx
++++ b/ts/components/Preferences.dom.tsx
+@@ -61,7 +61,7 @@ import type {
+   ZoomFactorType,
+   StorageAccessType,
+ } from '../types/StorageKeys.std.ts';
+-import type { ThemeSettingType } from '../util/theme.std.ts';
++import type { BrandThemeType, ThemeSettingType } from '../util/theme.std.ts';
+ import type { AnyToast } from '../types/Toast.dom.tsx';
+ import { ToastType } from '../types/Toast.dom.tsx';
+ import type { ConversationType } from '../state/ducks/conversations.preload.ts';
+@@ -173,6 +173,7 @@ export type PropsDataType = {
+   selectedMicrophone?: AudioDevice;
+   selectedSpeaker?: AudioDevice;
+   sentMediaQualitySetting: SentMediaQualitySettingType;
++  brandTheme: BrandThemeType | undefined;
+   themeSetting: ThemeSettingType | undefined;
+   universalExpireTimer: DurationInSeconds;
+   whoCanFindMe: PhoneNumberDiscoverability;
+@@ -355,6 +356,7 @@ type PropsFunctionType = {
+   onSentMediaQualityChange: SelectChangeHandlerType<SentMediaQualityType>;
+   onSpellCheckChange: CheckboxChangeHandlerType;
+   onTextFormattingChange: CheckboxChangeHandlerType;
++  onBrandThemeChange: SelectChangeHandlerType<BrandThemeType>;
+   onThemeChange: SelectChangeHandlerType<ThemeType>;
+   onToggleNavTabsCollapse: (navTabsCollapsed: boolean) => void;
+   onTypingIndicatorsChange: CheckboxChangeHandlerType;
+@@ -540,6 +542,7 @@ export function Preferences({
+   onSentMediaQualityChange,
+   onSpellCheckChange,
+   onTextFormattingChange,
++  onBrandThemeChange,
+   onThemeChange,
+   onToggleNavTabsCollapse,
+   onTypingIndicatorsChange,
+@@ -587,6 +590,7 @@ export function Preferences({
+   startPlaintextExport,
+   localeOverride,
+   theme,
++  brandTheme,
+   themeSetting,
+   universalExpireTimer,
+   validateBackup,
+@@ -619,6 +623,7 @@ export function Preferences({
+   weArePrimaryDevice,
+ }: PropsType): JSX.Element {
+   const storiesId = useId();
++  const brandThemeSelectId = useId();
+   const themeSelectId = useId();
+   const zoomSelectId = useId();
+   const languageId = useId();
+@@ -1131,6 +1136,34 @@ export function Preferences({
+             </AxoConfirmDialog.Action>
+           </AxoConfirmDialog.Root>
+         )}
++        <Control
++          icon
++          left={
++            <label htmlFor={brandThemeSelectId}>
++              {i18n('icu:Preferences--colour-palette')}
++            </label>
++          }
++          right={
++            <Select
++              id={brandThemeSelectId}
++              disabled={brandTheme === undefined}
++              onChange={value => {
++                onBrandThemeChange(value as BrandThemeType);
++              }}
++              options={[
++                {
++                  text: i18n('icu:Preferences--colour-palette-vesper'),
++                  value: 'vesper',
++                },
++                {
++                  text: i18n('icu:Preferences--colour-palette-signal'),
++                  value: 'signal',
++                },
++              ]}
++              value={brandTheme}
++            />
++          }
++        />
+         <Control
+           icon
+           left={
+diff --git a/ts/components/VesperTitleBar.dom.tsx b/ts/components/VesperTitleBar.dom.tsx
+new file mode 100644
+index 000000000..5215e2245
+--- /dev/null
++++ b/ts/components/VesperTitleBar.dom.tsx
+@@ -0,0 +1,196 @@
++// Copyright 2026 Signal Messenger, LLC
++// SPDX-License-Identifier: AGPL-3.0-only
++
++import type {
++  JSX,
++  KeyboardEvent as ReactKeyboardEvent,
++  MouseEvent as ReactMouseEvent,
++} from 'react';
++import { useEffect, useRef, useState } from 'react';
++
++import { AxoDragRegion } from '../axo/AxoDragRegion.dom.tsx';
++import type { TitleBarMenuItemType } from '../window.d.ts';
++
++type PropsType = Readonly<{
++  isMaximized: boolean;
++}>;
++
++export function VesperTitleBar({ isMaximized }: PropsType): JSX.Element {
++  const { i18n } = window.SignalContext;
++  const [menuItems, setMenuItems] = useState<
++    ReadonlyArray<TitleBarMenuItemType>
++  >([]);
++  const [menuVisible, setMenuVisible] = useState(false);
++  const [openMenuIndex, setOpenMenuIndex] = useState<number>();
++  const altState = useRef({ pressed: false, usedWithAnotherKey: false });
++
++  useEffect(() => {
++    let canceled = false;
++
++    const loadTitleBarState = async () => {
++      const state = await window.IPC.getTitleBarState();
++      if (canceled) {
++        return;
++      }
++      setMenuItems(state.menuItems);
++      setMenuVisible(state.menuVisible);
++    };
++    void loadTitleBarState();
++
++    const unsubscribe = window.IPC.onTitleBarMenuVisibilityChange(visible => {
++      setMenuVisible(visible);
++    });
++
++    const onKeyDown = (event: KeyboardEvent) => {
++      if (event.key === 'Alt') {
++        if (!event.repeat) {
++          altState.current = {
++            pressed: true,
++            usedWithAnotherKey: false,
++          };
++        }
++        event.preventDefault();
++        return;
++      }
++
++      if (altState.current.pressed) {
++        altState.current.usedWithAnotherKey = true;
++      }
++    };
++
++    const onKeyUp = (event: KeyboardEvent) => {
++      if (event.key !== 'Alt') {
++        return;
++      }
++      if (altState.current.pressed && !altState.current.usedWithAnotherKey) {
++        setMenuVisible(visible => !visible);
++      }
++      altState.current = { pressed: false, usedWithAnotherKey: false };
++      event.preventDefault();
++    };
++
++    const resetAltState = () => {
++      altState.current = { pressed: false, usedWithAnotherKey: false };
++    };
++
++    window.addEventListener('keydown', onKeyDown, true);
++    window.addEventListener('keyup', onKeyUp, true);
++    window.addEventListener('blur', resetAltState);
++
++    return () => {
++      canceled = true;
++      unsubscribe();
++      window.removeEventListener('keydown', onKeyDown, true);
++      window.removeEventListener('keyup', onKeyUp, true);
++      window.removeEventListener('blur', resetAltState);
++    };
++  }, []);
++
++  const openMenu = async (
++    item: TitleBarMenuItemType,
++    event:
++      | ReactKeyboardEvent<HTMLButtonElement>
++      | ReactMouseEvent<HTMLButtonElement>
++  ) => {
++    const rect = event.currentTarget.getBoundingClientRect();
++    setOpenMenuIndex(item.index);
++    try {
++      await window.IPC.popupTitleBarMenu(item.index, rect.left, rect.bottom);
++    } finally {
++      setOpenMenuIndex(undefined);
++    }
++  };
++
++  return (
++    <AxoDragRegion.Root always>
++      <header
++        className="VesperTitleBar"
++        onDoubleClick={event => {
++          if (!(event.target as HTMLElement).closest('button')) {
++            window.IPC.titleBarDoubleClick();
++          }
++        }}
++      >
++        <div className="VesperTitleBar__identity" aria-label="Vesper">
++          <img
++            className="VesperTitleBar__logo"
++            src="images/vesper-logo.svg"
++            alt=""
++          />
++          <span>Vesper</span>
++        </div>
++
++        <nav
++          className="VesperTitleBar__menus"
++          aria-label={i18n('icu:VesperTitleBar--menu')}
++          aria-hidden={!menuVisible}
++        >
++          {menuItems.map(item => (
++            <button
++              className="VesperTitleBar__menu"
++              data-open={openMenuIndex === item.index || undefined}
++              key={item.index}
++              onClick={event => {
++                void openMenu(item, event);
++              }}
++              onKeyDown={event => {
++                if (event.key === 'ArrowDown') {
++                  event.preventDefault();
++                  void openMenu(item, event);
++                }
++              }}
++              tabIndex={menuVisible ? 0 : -1}
++              type="button"
++            >
++              {item.label}
++            </button>
++          ))}
++        </nav>
++
++        <div className="VesperTitleBar__drag-space" />
++
++        <div className="VesperTitleBar__controls">
++          <button
++            aria-label={i18n('icu:windowMenuMinimize')}
++            className="VesperTitleBar__control VesperTitleBar__control--minimize"
++            onClick={() => {
++              void window.IPC.titleBarWindowAction('minimize');
++            }}
++            title={i18n('icu:windowMenuMinimize')}
++            type="button"
++          />
++          <button
++            aria-label={
++              isMaximized
++                ? i18n('icu:VesperTitleBar--restore')
++                : i18n('icu:windowMenuZoom')
++            }
++            className={`VesperTitleBar__control ${
++              isMaximized
++                ? 'VesperTitleBar__control--restore'
++                : 'VesperTitleBar__control--maximize'
++            }`}
++            onClick={() => {
++              void window.IPC.titleBarWindowAction('toggle-maximize');
++            }}
++            title={
++              isMaximized
++                ? i18n('icu:VesperTitleBar--restore')
++                : i18n('icu:windowMenuZoom')
++            }
++            type="button"
++          />
++          <button
++            aria-label={i18n('icu:windowMenuClose')}
++            className="VesperTitleBar__control VesperTitleBar__control--close"
++            onClick={() => {
++              void window.IPC.titleBarWindowAction('close');
++            }}
++            title={i18n('icu:windowMenuClose')}
++            type="button"
++          />
++        </div>
++      </header>
++    </AxoDragRegion.Root>
++  );
++}
+diff --git a/ts/main/settingsChannel.main.ts b/ts/main/settingsChannel.main.ts
+index 98bf35265..2faf65157 100644
+--- a/ts/main/settingsChannel.main.ts
++++ b/ts/main/settingsChannel.main.ts
+@@ -16,6 +16,7 @@ import type { EphemeralSettings } from '../util/preload.preload.ts';
+ const log = createLogger('settingsChannel');
+ 
+ const EPHEMERAL_NAME_MAP = new Map([
++  ['brandTheme', 'vesper-brand-theme'],
+   ['spellCheck', 'spell-check'],
+   ['systemTraySetting', 'system-tray-setting'],
+   ['themeSetting', 'theme-setting'],
+@@ -45,6 +46,7 @@ export class SettingsChannel extends EventEmitter {
+   }
+ 
+   public install(): void {
++    this.#installEphemeralSetting('brandTheme');
+     this.#installEphemeralSetting('themeSetting');
+     this.#installEphemeralSetting('systemTraySetting');
+     this.#installEphemeralSetting('localeOverride');
+diff --git a/ts/state/smart/Preferences.preload.tsx b/ts/state/smart/Preferences.preload.tsx
+index 777cbb35a..1576d5a0e 100644
+--- a/ts/state/smart/Preferences.preload.tsx
++++ b/ts/state/smart/Preferences.preload.tsx
+@@ -103,6 +103,7 @@ import {
+ import type { SettingsLocation } from '../../types/Nav.std.ts';
+ import type { StorageAccessType } from '../../types/Storage.d.ts';
+ import type { ThemeType } from '../../util/preload.preload.ts';
++import type { BrandThemeType } from '../../util/theme.std.ts';
+ import type { WidthBreakpoint } from '../../components/_util.std.ts';
+ import { DialogType } from '../../types/Dialogs.std.ts';
+ import { promptOSAuth } from '../../util/promptOSAuth.preload.ts';
+@@ -406,6 +407,7 @@ export function SmartPreferences(): JSX.Element | null {
+   const [hasContentProtection, setContentProtection] = useState<boolean>();
+   const [hasSpellCheck, setSpellCheck] = useState<boolean>();
+   const [hasDebugLogging, setDebugLogging] = useState<boolean>();
++  const [brandTheme, setBrandTheme] = useState<BrandThemeType>();
+   const [themeSetting, setThemeSetting] = useState<ThemeType>();
+ 
+   useEffect(() => {
+@@ -462,6 +464,15 @@ export function SmartPreferences(): JSX.Element | null {
+     };
+     drop(loadThemeSetting());
+ 
++    const loadBrandTheme = async () => {
++      const value = await window.Events.getBrandTheme();
++      if (canceled) {
++        return;
++      }
++      setBrandTheme(value);
++    };
++    drop(loadBrandTheme());
++
+     return () => {
+       canceled = true;
+     };
+@@ -509,6 +520,10 @@ export function SmartPreferences(): JSX.Element | null {
+     drop(window.Events.setThemeSetting(value));
+     drop(themeChanged());
+   };
++  const onBrandThemeChange = (value: BrandThemeType) => {
++    setBrandTheme(value);
++    drop(window.Events.setBrandTheme(value));
++  };
+ 
+   // Async IPC for electron configuration, all can be modified
+ 
+@@ -750,7 +765,7 @@ export function SmartPreferences(): JSX.Element | null {
+     });
+   const [hasHideMenuBar, onHideMenuBarChange] = createItemsAccess(
+     'hide-menu-bar',
+-    false,
++    true,
+     value => {
+       window.IPC.setAutoHideMenuBar(value);
+       window.IPC.setMenuBarVisibility(!value);
+@@ -1053,6 +1068,7 @@ export function SmartPreferences(): JSX.Element | null {
+         onSpellCheckChange={onSpellCheckChange}
+         onTextFormattingChange={onTextFormattingChange}
+         onThemeChange={onThemeChange}
++        onBrandThemeChange={onBrandThemeChange}
+         onToggleNavTabsCollapse={toggleNavTabsCollapse}
+         onTypingIndicatorsChange={onTypingIndicatorsChange}
+         onUniversalExpireTimerChange={onUniversalExpireTimerChange}
+@@ -1109,6 +1125,7 @@ export function SmartPreferences(): JSX.Element | null {
+         startLocalBackupExport={startLocalBackupExport}
+         startPlaintextExport={startPlaintextExport}
+         theme={theme}
++        brandTheme={brandTheme}
+         themeSetting={themeSetting}
+         universalExpireTimer={universalExpireTimer}
+         validateBackup={validateBackup}
+diff --git a/ts/test-node/util/vesperDeleteForEveryone_test.std.ts b/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
+index 22a6bea4f..6c2f77ffe 100644
+--- a/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
++++ b/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 amber
++// Copyright 2026 Signal Messenger, LLC
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import { assert } from 'chai';
+diff --git a/ts/test-node/util/vesperProtocol_test.std.ts b/ts/test-node/util/vesperProtocol_test.std.ts
+index cea47c92e..779e5ab3f 100644
+--- a/ts/test-node/util/vesperProtocol_test.std.ts
++++ b/ts/test-node/util/vesperProtocol_test.std.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 amber
++// Copyright 2026 Signal Messenger, LLC
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import { assert } from 'chai';
+diff --git a/ts/util/createIPCEvents.preload.ts b/ts/util/createIPCEvents.preload.ts
+index 988f913cd..faec18bb8 100644
+--- a/ts/util/createIPCEvents.preload.ts
++++ b/ts/util/createIPCEvents.preload.ts
+@@ -36,6 +36,7 @@ import type {
+ import { SystemTraySetting } from '../types/SystemTraySetting.std.ts';
+ import { putStickers } from '../textsecure/WebAPI.preload.ts';
+ import OS from './os/osPreload.preload.ts';
++import type { BrandThemeType } from './theme.std.ts';
+ 
+ const { noop } = lodash;
+ 
+@@ -92,6 +93,7 @@ type ValuesWithGetters = Omit<
+   | 'contentProtection'
+   | 'debugLogging'
+   | 'systemTraySetting'
++  | 'brandTheme'
+   | 'themeSetting'
+   | 'zoomFactor'
+ >;
+@@ -127,6 +129,7 @@ export type IPCEventsGettersType = {
+   getContentProtection: () => Promise<boolean>;
+   getDebugLogging: () => Promise<boolean>;
+   getSystemTraySetting: () => Promise<SystemTraySetting>;
++  getBrandTheme: () => Promise<BrandThemeType>;
+   getThemeSetting: () => Promise<ThemeType>;
+   getZoomFactor: () => Promise<ZoomFactorType>;
+   // Events
+@@ -239,6 +242,12 @@ export function createIPCEvents(
+     setSystemTraySetting: async (value: SystemTraySetting) => {
+       await setEphemeralSetting('systemTraySetting', value);
+     },
++    getBrandTheme: async () => {
++      return (await getEphemeralSetting('brandTheme')) ?? 'vesper';
++    },
++    setBrandTheme: async (value: BrandThemeType) => {
++      await setEphemeralSetting('brandTheme', value);
++    },
+     getThemeSetting: async () => {
+       return (await getEphemeralSetting('themeSetting')) ?? 'system';
+     },
+diff --git a/ts/util/preload.preload.ts b/ts/util/preload.preload.ts
+index c7d971740..61f95951c 100644
+--- a/ts/util/preload.preload.ts
++++ b/ts/util/preload.preload.ts
+@@ -7,6 +7,7 @@ import { strictAssert } from './assert.std.ts';
+ import * as Errors from '../types/errors.std.ts';
+ import type { IPCEventsValuesType } from './createIPCEvents.preload.ts';
+ import type { SystemTraySetting } from '../types/SystemTraySetting.std.ts';
++import type { BrandThemeType } from './theme.std.ts';
+ 
+ type SettingOptionsType = {
+   getter?: boolean;
+@@ -21,6 +22,7 @@ export type SettingType<Value> = Readonly<{
+ export type ThemeType = 'light' | 'dark' | 'system';
+ 
+ export type EphemeralSettings = {
++  brandTheme: BrandThemeType;
+   localeOverride: string | null;
+   spellCheck: boolean;
+   contentProtection: boolean;
+diff --git a/ts/util/theme.std.ts b/ts/util/theme.std.ts
+index 003c6e5d7..47e9719e2 100644
+--- a/ts/util/theme.std.ts
++++ b/ts/util/theme.std.ts
+@@ -13,6 +13,13 @@ export enum Theme {
+ export const themeSettingSchema = z.enum(['system', 'light', 'dark']);
+ export type ThemeSettingType = z.infer<typeof themeSettingSchema>;
+ 
++export const brandThemeSchema = z.enum(['vesper', 'signal']);
++export type BrandThemeType = z.infer<typeof brandThemeSchema>;
++
++export function brandThemeClassName(brandTheme: BrandThemeType): string {
++  return `${brandTheme}-brand-theme`;
++}
++
+ export function themeClassName(theme: Theme): string {
+   switch (theme) {
+     case Theme.Light:
+diff --git a/ts/util/vesperDeleteForEveryone.std.ts b/ts/util/vesperDeleteForEveryone.std.ts
+index b17bbcfa3..e6074a3f0 100644
+--- a/ts/util/vesperDeleteForEveryone.std.ts
++++ b/ts/util/vesperDeleteForEveryone.std.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 amber
++// Copyright 2026 Signal Messenger, LLC
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ export function shouldKeepDeletedMessage({
+diff --git a/ts/util/vesperProtocol.std.ts b/ts/util/vesperProtocol.std.ts
+index d40d82005..486a7d26c 100644
+--- a/ts/util/vesperProtocol.std.ts
++++ b/ts/util/vesperProtocol.std.ts
+@@ -1,11 +1,10 @@
+-// Copyright 2026 amber
++// Copyright 2026 Signal Messenger, LLC
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+-export const VESPER_PROTOCOL_SCHEME = 'vesper';
+-export const VESPER_CAPTCHA_PROTOCOL_SCHEME = 'vespercaptcha';
+-export const VESPER_DEVELOPMENT_PROTOCOL_SCHEME = 'vesper-development';
+-export const VESPER_DEVELOPMENT_CAPTCHA_PROTOCOL_SCHEME =
+-  'vespercaptcha-development';
++const VESPER_PROTOCOL_SCHEME = 'vesper';
++const VESPER_CAPTCHA_PROTOCOL_SCHEME = 'vespercaptcha';
++const VESPER_DEVELOPMENT_PROTOCOL_SCHEME = 'vesper-development';
++const VESPER_DEVELOPMENT_CAPTCHA_PROTOCOL_SCHEME = 'vespercaptcha-development';
+ 
+ const ProtocolAliases = new Map([
+   [`${VESPER_PROTOCOL_SCHEME}:`, 'sgnl:'],
+diff --git a/ts/window.d.ts b/ts/window.d.ts
+index a219c1c39..62fe940fd 100644
+--- a/ts/window.d.ts
++++ b/ts/window.d.ts
+@@ -26,6 +26,17 @@ import type { WindowsNotificationData } from './services/notifications.preload.t
+ import type { QueryStatsOptions } from './sql/main.main.ts';
+ import type { SocketStatuses } from './textsecure/SocketManager.preload.ts';
+ 
++export type TitleBarMenuItemType = Readonly<{
++  index: number;
++  label: string;
++}>;
++
++export type TitleBarStateType = Readonly<{
++  isCustomTitleBar: boolean;
++  menuItems: ReadonlyArray<TitleBarMenuItemType>;
++  menuVisible: boolean;
++}>;
++
+ export type IPCType = {
+   addSetupMenuItems: () => void;
+   clearAllWindowsNotifications: () => Promise<void>;
+@@ -41,6 +52,7 @@ export type IPCType = {
+     mediaType: 'screen' | 'microphone' | 'camera'
+   ) => Promise<ReturnType<SystemPreferences['getMediaAccessStatus']>>;
+   getMediaCameraPermissions: () => Promise<boolean | undefined>;
++  getTitleBarState: () => Promise<TitleBarStateType>;
+   openSystemMediaPermissions: (
+     mediaType: 'microphone' | 'camera' | 'screenCapture'
+   ) => Promise<void>;
+@@ -55,6 +67,10 @@ export type IPCType = {
+   setMediaPermissions: (value: boolean) => Promise<void>;
+   setMediaCameraPermissions: (value: boolean) => Promise<void>;
+   setMenuBarVisibility: (value: boolean) => void;
++  onTitleBarMenuVisibilityChange: (
++    callback: (visible: boolean) => void
++  ) => () => void;
++  popupTitleBarMenu: (index: number, x: number, y: number) => Promise<void>;
+   showDebugLog: (options?: { mode?: 'submit' | 'close' }) => void;
+   showCallDiagnostic: () => void;
+   closeCallDiagnostic: () => void;
+@@ -71,6 +87,9 @@ export type IPCType = {
+   startTrackingQueryStats: () => void;
+   stopTrackingQueryStats: (options?: QueryStatsOptions) => void;
+   titleBarDoubleClick: () => void;
++  titleBarWindowAction: (
++    action: 'minimize' | 'toggle-maximize' | 'close'
++  ) => Promise<void>;
+   updateTrayIcon: (count: number) => void;
+ };
+ 
+diff --git a/ts/windows/AppProvider.dom.tsx b/ts/windows/AppProvider.dom.tsx
+index 20b93f19c..dec0dc56a 100644
+--- a/ts/windows/AppProvider.dom.tsx
++++ b/ts/windows/AppProvider.dom.tsx
+@@ -1,9 +1,10 @@
+ // Copyright 2026 Signal Messenger, LLC
+ // SPDX-License-Identifier: AGPL-3.0-only
+ import type { FC, ReactNode } from 'react';
+-import { memo, StrictMode } from 'react';
++import { memo, StrictMode, useEffect } from 'react';
+ import { AxoProvider } from '../axo/AxoProvider.dom.tsx';
+ import type { AxoProviderProps } from '../axo/AxoProvider.dom.tsx';
++import { brandThemeClassName } from '../util/theme.std.ts';
+ 
+ export type AppProviderProps = Readonly<{
+   children: ReactNode;
+@@ -23,6 +24,36 @@ export const AppProvider: FC<AppProviderProps> = memo(
+       'AxoBadge.MaxOverflow': max => i18n('icu:AxoBadge.MaxOverflow', { max }),
+     };
+ 
++    useEffect(() => {
++      const abortController = new AbortController();
++
++      async function applyBrandTheme() {
++        const brandTheme =
++          (await window.SignalContext.Settings.brandTheme.getValue()) ??
++          'vesper';
++        if (abortController.signal.aborted) {
++          return;
++        }
++        document.body.classList.remove(
++          brandThemeClassName('signal'),
++          brandThemeClassName('vesper')
++        );
++        document.body.classList.add(brandThemeClassName(brandTheme));
++      }
++
++      async function loop() {
++        while (!abortController.signal.aborted) {
++          // oxlint-disable-next-line no-await-in-loop
++          await applyBrandTheme();
++          // oxlint-disable-next-line no-await-in-loop
++          await window.SignalContext.Settings.waitForChange();
++        }
++      }
++
++      void loop();
++      return () => abortController.abort();
++    }, []);
++
+     return (
+       <StrictMode>
+         <AxoProvider dir={dir} messages={messages}>
+diff --git a/ts/windows/applyTheme.dom.ts b/ts/windows/applyTheme.dom.ts
+index c46645bfc..6af0fee21 100644
+--- a/ts/windows/applyTheme.dom.ts
++++ b/ts/windows/applyTheme.dom.ts
+@@ -1,16 +1,26 @@
+ // Copyright 2021 Signal Messenger, LLC
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
++import { brandThemeClassName } from '../util/theme.std.ts';
++
+ async function applyTheme() {
+-  const theme = await window.SignalContext.Settings.themeSetting.getValue();
++  const [theme, brandTheme] = await Promise.all([
++    window.SignalContext.Settings.themeSetting.getValue(),
++    window.SignalContext.Settings.brandTheme.getValue(),
++  ]);
+   document.body.classList.remove('light-theme');
+   document.body.classList.remove('dark-theme');
++  document.body.classList.remove(
++    brandThemeClassName('signal'),
++    brandThemeClassName('vesper')
++  );
+   document.body.classList.add(
+     `${
+       theme === 'system'
+         ? window.SignalContext.nativeThemeListener.getSystemTheme()
+         : theme
+-    }-theme`
++    }-theme`,
++    brandThemeClassName(brandTheme ?? 'vesper')
+   );
+ }
+ 
+diff --git a/ts/windows/context.preload.ts b/ts/windows/context.preload.ts
+index f4220f6b0..3f9c94510 100644
+--- a/ts/windows/context.preload.ts
++++ b/ts/windows/context.preload.ts
+@@ -58,6 +58,7 @@ export type MinimalSignalContextType = {
+   nativeThemeListener: NativeThemeType;
+   restartApp: () => void;
+   Settings: {
++    brandTheme: SettingType<SettingsValuesType['brandTheme']>;
+     themeSetting: SettingType<SettingsValuesType['themeSetting']>;
+     waitForChange: () => Promise<void>;
+   };
+diff --git a/ts/windows/main/phase1-ipc.preload.ts b/ts/windows/main/phase1-ipc.preload.ts
+index b995eca5e..60d6e2612 100644
+--- a/ts/windows/main/phase1-ipc.preload.ts
++++ b/ts/windows/main/phase1-ipc.preload.ts
+@@ -38,6 +38,16 @@ const { mapValues } = lodash;
+ 
+ const log = createLogger('phase1-ipc');
+ 
++const titleBarMenuVisibilityCallbacks = new Set<(visible: boolean) => void>();
++ipc.on('titlebar:set-menu-visibility', (_event, visible: unknown) => {
++  if (typeof visible !== 'boolean') {
++    return;
++  }
++  for (const callback of titleBarMenuVisibilityCallbacks) {
++    callback(visible);
++  }
++});
++
+ // We are comfortable doing this because we verified the type on the other side!
+ const { config } = SignalContext;
+ 
+@@ -110,6 +120,7 @@ const IPC: IPCType = {
+   getMediaPermissions: () => ipc.invoke('settings:get:mediaPermissions'),
+   getMediaCameraPermissions: () =>
+     ipc.invoke('settings:get:mediaCameraPermissions'),
++  getTitleBarState: () => ipc.invoke('titlebar:get-state'),
+   logAppLoadedEvent: ({ processedCount }) =>
+     ipc.send('signal-app-loaded', {
+       // Sequence of events:
+@@ -136,6 +147,12 @@ const IPC: IPCType = {
+   setBadge: badge => ipc.send('set-badge', badge),
+   setMenuBarVisibility: visibility =>
+     ipc.send('set-menu-bar-visibility', visibility),
++  onTitleBarMenuVisibilityChange: callback => {
++    titleBarMenuVisibilityCallbacks.add(callback);
++    return () => titleBarMenuVisibilityCallbacks.delete(callback);
++  },
++  popupTitleBarMenu: (index, x, y) =>
++    ipc.invoke('titlebar:popup-menu', index, x, y),
+   showDebugLog: (options?: { mode?: 'submit' | 'close' }) => {
+     log.info('showDebugLog', options);
+     ipc.send('show-debug-log', options);
+@@ -180,6 +197,7 @@ const IPC: IPCType = {
+   titleBarDoubleClick: () => {
+     ipc.send('title-bar-double-click');
+   },
++  titleBarWindowAction: action => ipc.invoke('titlebar:window-action', action),
+   updateTrayIcon: unreadCount => ipc.send('update-tray-icon', unreadCount),
+   whenWindowVisible,
+ };
+diff --git a/ts/windows/minimalContext.preload.ts b/ts/windows/minimalContext.preload.ts
+index 7e670a3d6..21765f0e4 100644
+--- a/ts/windows/minimalContext.preload.ts
++++ b/ts/windows/minimalContext.preload.ts
+@@ -66,6 +66,7 @@ export const MinimalSignalContext: MinimalSignalContextType = {
+     release: config.osRelease,
+   },
+   Settings: {
++    brandTheme: createSetting('brandTheme', { setter: false }),
+     themeSetting: createSetting('themeSetting', { setter: false }),
+     waitForChange: waitForSettingsChange,
+   },
+diff --git a/ts/windows/preload.preload.ts b/ts/windows/preload.preload.ts
+index abee6db14..391496326 100644
+--- a/ts/windows/preload.preload.ts
++++ b/ts/windows/preload.preload.ts
+@@ -3,6 +3,7 @@
+ 
+ import { installEphemeralSetting } from '../util/preload.preload.ts';
+ 
++installEphemeralSetting('brandTheme');
+ installEphemeralSetting('contentProtection');
+ installEphemeralSetting('debugLogging');
+ installEphemeralSetting('localeOverride');
