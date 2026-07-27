@@ -25,9 +25,20 @@ import { promisify } from "node:util";
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const overlay = path.join(root, "overlay");
 const linuxSource = path.join(root, "branding", "vesper-icon.svg");
+const squircleSource = path.join(root, "branding", "vesper-icon-squircle.svg");
 const check = process.argv[2] === "--check";
 const pngSizes = [16, 24, 32, 48, 64, 128, 256, 512, 1024];
+const icoSizes = [16, 20, 24, 32, 40, 48, 64, 128, 256];
 const traySizes = [16, 32, 48, 256];
+const icnsTypes = new Map([
+  [16, "icp4"],
+  [32, "icp5"],
+  [64, "icp6"],
+  [128, "ic07"],
+  [256, "ic08"],
+  [512, "ic09"],
+  [1024, "ic10"],
+]);
 const execFileAsync = promisify(execFile);
 
 if (process.argv.length > (check ? 3 : 2)) {
@@ -52,6 +63,14 @@ expectBrandTokens("Vesper Linux application icon", linuxSourceText, [
   "M778.85 378.89L662.34 562.14",
 ]);
 
+const squircleSourceData = await readFile(squircleSource);
+const squircleSourceText = squircleSourceData.toString("utf8");
+expectBrandTokens("Vesper Windows/macOS application icon", squircleSourceText, [
+  '<stop offset="0" stop-color="#6341FF"/>',
+  '<stop offset="1" stop-color="#613FFF"/>',
+  '<rect width="1024" height="1024" rx="229"',
+  "M778.85 378.89L662.34 562.14",
+]);
 expectBrandTokens(
   "Vesper titlebar icon",
   await readFile(path.join(overlay, "images", "titlebar_icon.svg"), "utf8"),
@@ -61,7 +80,20 @@ expectBrandTokens(
     "M778.85 378.89L662.34 562.14",
   ],
 );
+expectBrandTokens(
+  "Vesper macOS icon",
+  await readFile(
+    path.join(overlay, "build", "icons", "mac", "AppIcon.icon", "icon.json"),
+    "utf8",
+  ),
+  [
+    '"srgb:0.38824,0.25490,1.00000,1.00000"',
+    '"srgb:0.38039,0.24706,1.00000,1.00000"',
+  ],
+);
+
 const linuxImage = await loadImage(linuxSource);
+const squircleImage = await loadImage(squircleSource);
 
 async function render(image, size, drawBadge = false) {
   const canvas = createCanvas(size, size);
@@ -78,14 +110,32 @@ async function render(image, size, drawBadge = false) {
     context.arc(x, y, radius, 0, Math.PI * 2);
     context.fillStyle = "#e00052";
     context.fill();
+
+    // Draw the mark directly so generated icons do not depend on whichever
+    // sans-serif font happens to be installed on the build host.
+    context.strokeStyle = "#fff";
+    context.lineCap = "round";
+    context.lineWidth = radius * 0.18;
+    context.beginPath();
+    context.moveTo(x, y - radius * 0.46);
+    context.lineTo(x, y + radius * 0.1);
+    context.stroke();
+    context.beginPath();
+    context.arc(x, y + radius * 0.45, radius * 0.09, 0, Math.PI * 2);
     context.fillStyle = "#fff";
-    context.font = `700 ${Math.round(size * 0.3)}px Inter, sans-serif`;
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.fillText("!", x, y + size * 0.015);
+    context.fill();
   }
 
   return canvas.toBuffer("image/png");
+}
+
+function iconComposerForeground(sourceText) {
+  const withoutDefinitions = sourceText.replace(/<defs>[\s\S]*?<\/defs>/, "");
+  const withoutBackground = withoutDefinitions.replace(/<rect\b[^>]*\/>/, "");
+  if (withoutBackground === sourceText || withoutBackground.includes("<rect")) {
+    throw new Error("Could not isolate the macOS icon foreground");
+  }
+  return withoutBackground;
 }
 
 async function write(relativePath, data) {
@@ -106,6 +156,11 @@ for (const size of pngSizes) {
   linuxPngs.set(size, await render(linuxImage, size));
 }
 
+const squirclePngs = new Map();
+for (const size of [...new Set([...icoSizes, ...icnsTypes.keys()])]) {
+  squirclePngs.set(size, await render(squircleImage, size));
+}
+
 for (const size of pngSizes) {
   await write(`build/icons/png/${size}x${size}.png`, linuxPngs.get(size));
 }
@@ -115,6 +170,11 @@ await write(
   "images/app-icon-with-error.png",
   await render(linuxImage, 128, true),
 );
+await write(
+  "build/icons/mac/AppIcon.icon/Assets/logo.svg",
+  Buffer.from(iconComposerForeground(squircleSourceText)),
+);
+
 for (const size of traySizes) {
   const data = linuxPngs.get(size);
   const name = `signal-tray-icon-${size}x${size}-base.png`;
@@ -179,8 +239,57 @@ try {
   await rm(trayGenerationRoot, { recursive: true });
 }
 
+function makeIco(sizes) {
+  const images = sizes.map((size) => ({
+    size,
+    data: squirclePngs.get(size),
+  }));
+  const headerSize = 6 + images.length * 16;
+  const header = Buffer.alloc(headerSize);
+  header.writeUInt16LE(0, 0);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(images.length, 4);
+
+  let offset = headerSize;
+  images.forEach(({ size, data }, index) => {
+    const entry = 6 + index * 16;
+    header.writeUInt8(size === 256 ? 0 : size, entry);
+    header.writeUInt8(size === 256 ? 0 : size, entry + 1);
+    header.writeUInt8(0, entry + 2);
+    header.writeUInt8(0, entry + 3);
+    header.writeUInt16LE(1, entry + 4);
+    header.writeUInt16LE(32, entry + 6);
+    header.writeUInt32LE(data.length, entry + 8);
+    header.writeUInt32LE(offset, entry + 12);
+    offset += data.length;
+  });
+  return Buffer.concat([header, ...images.map(({ data }) => data)]);
+}
+
+const ico = makeIco(icoSizes);
+await write("build/icons/win/icon.ico", ico);
+await write("build/icon.ico", ico);
+await write("build/installerIcon.ico", ico);
+await write("build/installerHeaderIcon.ico", ico);
+
+const icnsChunks = [];
+for (const [size, type] of icnsTypes) {
+  const data = squirclePngs.get(size);
+  const chunk = Buffer.alloc(8 + data.length);
+  chunk.write(type, 0, 4, "ascii");
+  chunk.writeUInt32BE(chunk.length, 4);
+  data.copy(chunk, 8);
+  icnsChunks.push(chunk);
+}
+const icnsLength =
+  8 + icnsChunks.reduce((total, chunk) => total + chunk.length, 0);
+const icnsHeader = Buffer.alloc(8);
+icnsHeader.write("icns", 0, 4, "ascii");
+icnsHeader.writeUInt32BE(icnsLength, 4);
+await write("build/dmg/icon.icns", Buffer.concat([icnsHeader, ...icnsChunks]));
+
 console.log(
-  `${check ? "Verified" : "Generated"} Vesper Linux icon overlays from ${
-    linuxSourceData.length
+  `${check ? "Verified" : "Generated"} Vesper icon overlays from ${
+    linuxSourceData.length + squircleSourceData.length
   } source bytes.`,
 );
