@@ -89,7 +89,7 @@ ELECTRON_DISABLE_SANDBOX=1 \
 NODE_ENV=test \
 NODE_OPTIONS='--import=tsx' \
 LANG=en-us \
-  ./node_modules/.bin/electron-mocha \
+  xvfb-run --auto-servernum ./node_modules/.bin/electron-mocha \
     --no-sandbox \
     --timeout 10000 \
     --extension ts,tsx,js,mjs \
