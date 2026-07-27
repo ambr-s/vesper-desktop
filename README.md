@@ -8,7 +8,22 @@ materialisation tools apply those changes to the Signal release recorded in
 Vesper uses its own application identity, storage and protocol handlers, so it can
 be installed alongside Signal Desktop.
 
-## Build on Linux
+Production installers also register Signal's `sgnl` fallback scheme so
+`signal.me` contact pages can hand links to Vesper. An operating system may show
+an application chooser when Signal Desktop is installed because custom schemes
+are registered as a whole. Vesper cannot claim verified ownership of the
+`https://signal.me` domain without Signal publishing Vesper's signing identity.
+
+Account configuration and captcha handoff pages are served by Vesper's
+Cloudflare Worker at `https://vsp.asy.st`; the clients do not depend on
+`signalcaptchas.org`.
+
+## Supported releases
+
+Release packaging currently targets Linux x64 as a Debian package, Flatpak and
+self-updating AppImage. Linux arm64 is not yet a release target.
+
+## Build on Linux x64
 
 Install `xvfb` and `libpulse0`, then run:
 
@@ -17,8 +32,8 @@ Install `xvfb` and `libpulse0`, then run:
 ```
 
 The script installs Signal Desktop's pinned Node and pnpm dependencies, runs the
-checks, and builds a Linux x64 Debian package in `work/release/`. It prints the
-package path and SHA-256 checksum when it finishes.
+checks, and builds Linux x64 Debian and AppImage packages in `work/release/`. It
+prints both package paths and SHA-256 checksums when it finishes.
 
 To build the Flatpak, install `flatpak-builder` through your package manager or
 install its user-scoped Flatpak:
@@ -31,9 +46,33 @@ flatpak install --user flathub org.flatpak.Builder
 
 The Flatpak build uses the verified Debian payload and writes
 `artifacts/flatpak/vesper-desktop_<version>_x86_64.flatpak`. The test command
-installs it for the current user as `systems.amber.Vesper` and runs a short
-smoke test. Vesper stores its database key through the desktop keyring and
-refuses Electron's plaintext password-store backend.
+checks it as `systems.amber.Vesper` and runs two isolated smoke tests without
+installing, replacing or stopping the user's app. Vesper stores its database
+key through the desktop keyring and refuses Electron's plaintext password-store
+backend.
+
+## Install on Linux
+
+To use the signed Debian repository:
+
+```bash
+curl -fsSL https://vspdb.asy.st/apt/vesper-archive-keyring.gpg |
+  sudo tee /usr/share/keyrings/vesper-archive-keyring.gpg >/dev/null
+curl -fsSL https://vspdb.asy.st/apt/vesper.sources |
+  sudo tee /etc/apt/sources.list.d/vesper.sources >/dev/null
+sudo apt update
+sudo apt install vesper-desktop
+```
+
+To install the signed Flatpak release:
+
+```bash
+flatpak install --from https://vspdb.asy.st/flatpak/vesper.flatpakref
+```
+
+The AppImage and its checksum are attached to each GitHub release. Make it
+executable and run it in place; AppImage installations use Vesper's independent
+AppImage update key.
 
 Source work belongs in the ignored `work/` checkout. Mechanical changes live in
 `transforms/`, Vesper-owned files in `overlay/`, and source integration changes in

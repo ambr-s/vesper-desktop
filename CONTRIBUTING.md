@@ -28,9 +28,12 @@ Signed-off-by: Your Name <you@example.com>
 
 The sign-off follows
 [Developer Certificate of Origin 1.1](https://developercertificate.org/) and is
-not a copyright assignment. GPG-sign Vesper feature commits. If you adapt work
-from Signal, Molly or another project, keep its notices and name the repository,
-path, commit, licence and original author in the commit or `NOTICE`.
+not a copyright assignment. GPG-sign authoring commits before their first
+export; format-patch preserves the DCO trailer but cannot preserve the Git
+commit object's signature, so commits replayed by `tools/materialize.sh` are
+expected to be unsigned. If you adapt work from Signal, Molly or another
+project, keep its notices and name the repository, path, commit, licence and
+original author in the commit or `NOTICE`.
 
 Never submit private keys, tokens, passwords, signing files, local credentials,
 dependencies or generated build output.

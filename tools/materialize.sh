@@ -85,16 +85,19 @@ if [[ "$UPSTREAM_REPOSITORY" == *"://"* || "$UPSTREAM_REPOSITORY" == git@* ]]; t
 fi
 git clone "${CLONE_ARGS[@]}" "$UPSTREAM_REPOSITORY" "$WORK"
 
-git -C "$WORK" config --local user.name "Vesper Materializer"
-git -C "$WORK" config --local user.email "vesper-materializer@users.noreply.github.com"
-git -C "$WORK" config --local commit.gpgsign false
 git -C "$WORK" switch -c "vesper/${TAG#v}"
 MATERIALIZE_DATE="$(git -C "$WORK" show -s --format=%aI HEAD)"
+MATERIALIZER_CONFIG=(
+  -c user.name="Vesper Materializer"
+  -c user.email="vesper-materializer@users.noreply.github.com"
+  -c commit.gpgsign=false
+)
 
 "$ROOT/tools/apply-transforms.sh" "$WORK"
 git -C "$WORK" add -A
 GIT_AUTHOR_DATE="$MATERIALIZE_DATE" GIT_COMMITTER_DATE="$MATERIALIZE_DATE" \
-  git -C "$WORK" -c commit.gpgsign=false commit --allow-empty -m "Vesper transforms"
+  git -C "$WORK" "${MATERIALIZER_CONFIG[@]}" \
+    commit --allow-empty -m "Vesper transforms"
 
 while IFS= read -r -d '' overlay_file; do
   relative_path="${overlay_file#"$ROOT/overlay/"}"
@@ -110,12 +113,13 @@ done < <(
 
 git -C "$WORK" add -A
 GIT_AUTHOR_DATE="$MATERIALIZE_DATE" GIT_COMMITTER_DATE="$MATERIALIZE_DATE" \
-  git -C "$WORK" -c commit.gpgsign=false commit --allow-empty -m "Vesper owned overlays"
+  git -C "$WORK" "${MATERIALIZER_CONFIG[@]}" \
+    commit --allow-empty -m "Vesper owned overlays"
 
 shopt -s nullglob
 PATCHES=("$ROOT"/patches/*.patch)
 if ((${#PATCHES[@]})); then
-  git -C "$WORK" -c commit.gpgsign=false am \
+  git -C "$WORK" "${MATERIALIZER_CONFIG[@]}" am \
     --3way \
     --committer-date-is-author-date \
     "${PATCHES[@]}"

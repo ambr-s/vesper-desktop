@@ -1,8 +1,9 @@
-From d8797d96571adc281cac720ec59d1df2ee36e351 Mon Sep 17 00:00:00 2001
-From: Vesper Materializer <vesper-materializer@users.noreply.github.com>
+From 5e9343f420cf0dbb6673ecaa6b1ecdaa41c9b6ab Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
 Date: Sun, 26 Jul 2026 13:53:39 +0100
-Subject: [PATCH 12/12] Add Vesper desktop palette and window chrome
+Subject: [PATCH 12/16] Add Vesper desktop palette and window chrome
 
+Signed-off-by: amber <amber@flourish.ch>
 ---
  _locales/en/messages.json                     |  20 ++
  app/main.main.ts                              | 157 ++++++++++++--
@@ -45,7 +46,7 @@ Subject: [PATCH 12/12] Add Vesper desktop palette and window chrome
  create mode 100644 ts/components/VesperTitleBar.dom.tsx
 
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index c1fab95ea..a64b360da 100644
+index f3713a038..ee70fc3a1 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
 @@ -311,6 +311,14 @@
@@ -425,7 +426,7 @@ index 8aaac09f4..95cdd2422 100644
      }
    }
 diff --git a/stylesheets/_modules.scss b/stylesheets/_modules.scss
-index a3ae2797e..3e258ecbf 100644
+index a621fe672..3a8539ad4 100644
 --- a/stylesheets/_modules.scss
 +++ b/stylesheets/_modules.scss
 @@ -388,7 +388,7 @@ $message-padding-horizontal: 12px;
@@ -437,7 +438,7 @@ index a3ae2797e..3e258ecbf 100644
  }
  
  .module-message__select-checkbox {
-@@ -6365,7 +6365,7 @@ button.module-calling-participants-list__contact {
+@@ -6384,7 +6384,7 @@ button.module-calling-participants-list__contact {
  }
  .module-message__action--incoming--in-another-call {
    @include mixins.light-theme {

@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vesper-config-service",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-27",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "vsp.asy.st",
+      "custom_domain": true
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "CONFIG",
+      "id": "10bca64c751b45199b6294173c242b38"
+    }
+  ],
+  "observability": {
+    "enabled": false
+  }
+}

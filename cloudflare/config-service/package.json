@@ -1,0 +1,21 @@
+{
+  "name": "@vesper/config-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "npm run typecheck && npm test",
+    "deploy": "wrangler deploy",
+    "developers-json": "node scripts/developers-json.mjs",
+    "hash-aci": "node scripts/hash-aci.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test/tsconfig.json",
+    "types": "wrangler types"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.18.8",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10",
+    "wrangler": "4.114.0"
+  }
+}

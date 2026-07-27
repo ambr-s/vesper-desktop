@@ -1,0 +1,350 @@
+From b97beadc47d7eb29075bd44c576439a953186291 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Mon, 27 Jul 2026 16:36:40 +0100
+Subject: [PATCH 16/16] fix: satisfy desktop release lint gate
+
+Use Vesper-owned copyright headers accepted by the fork lint rules, give DOM-dependent developer helpers accurate suffixes, and resolve strict lint findings without making config refresh block startup.
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ stylesheets/components/BrandTheme.scss        |  2 +-
+ stylesheets/components/VesperTitleBar.scss    |  2 +-
+ ts/VesperConfig.dom.ts                        | 14 +++++++----
+ ts/background.preload.ts                      | 24 +++++++++++--------
+ ts/components/StoryListItem.dom.tsx           |  2 +-
+ ts/components/VesperTitleBar.dom.tsx          |  2 +-
+ .../conversation/AboutContactModal.dom.tsx    |  2 +-
+ .../conversation/ContactName.dom.tsx          |  2 +-
+ .../conversation/ConversationHeader.dom.tsx   |  2 +-
+ .../conversation/GroupV1Migration.dom.tsx     |  9 +++----
+ .../ConversationDetailsHeader.dom.tsx         |  2 +-
+ ts/test-node/VesperConfig_test.dom.ts         | 10 ++++++--
+ ...test.std.ts => isVesperAuthor_test.dom.ts} |  4 ++--
+ .../util/vesperDeleteForEveryone_test.std.ts  |  2 +-
+ ts/test-node/util/vesperProtocol_test.std.ts  |  2 +-
+ ...perAuthor.std.ts => isVesperAuthor.dom.ts} |  2 +-
+ ts/util/lint/license_comments.node.ts         |  2 +-
+ ts/util/vesperDeleteForEveryone.std.ts        |  2 +-
+ ts/util/vesperProtocol.std.ts                 |  2 +-
+ 19 files changed, 50 insertions(+), 39 deletions(-)
+ rename ts/test-node/util/{isVesperAuthor_test.std.ts => isVesperAuthor_test.dom.ts} (93%)
+ rename ts/util/{isVesperAuthor.std.ts => isVesperAuthor.dom.ts} (89%)
+
+diff --git a/stylesheets/components/BrandTheme.scss b/stylesheets/components/BrandTheme.scss
+index d7f0b57e1..8706b3ba2 100644
+--- a/stylesheets/components/BrandTheme.scss
++++ b/stylesheets/components/BrandTheme.scss
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ @use 'sass:color';
+diff --git a/stylesheets/components/VesperTitleBar.scss b/stylesheets/components/VesperTitleBar.scss
+index a230d3e8b..a5444384c 100644
+--- a/stylesheets/components/VesperTitleBar.scss
++++ b/stylesheets/components/VesperTitleBar.scss
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ .VesperTitleBar {
+diff --git a/ts/VesperConfig.dom.ts b/ts/VesperConfig.dom.ts
+index 4ac3c91db..dea61180f 100644
+--- a/ts/VesperConfig.dom.ts
++++ b/ts/VesperConfig.dom.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import * as Bytes from './Bytes.std.ts';
+@@ -8,6 +8,10 @@ import type { AciString, ServiceIdString } from './types/ServiceId.std.ts';
+ import type { StorageInterface } from './types/Storage.d.ts';
+ import { DAY } from './util/durations/index.std.ts';
+ import { isAciString } from './util/isAciString.std.ts';
++import {
++  getVesperAuthorAciHashes,
++  setVesperAuthorAciHashes,
++} from './util/vesperAuthorACIs.std.ts';
+ 
+ const log = createLogger('VesperConfig');
+ 
+@@ -50,7 +54,6 @@ const EMPTY_CONFIG: VesperConfigResponse = {
+   flagOverrides: [],
+ };
+ 
+-let developerAciHashes: ReadonlySet<string> = new Set();
+ let flagOverrides: ReadonlyMap<string, VesperConfigValue> = new Map();
+ 
+ const aciHashCache = new Map<AciString, string>();
+@@ -115,7 +118,7 @@ export function parseVesperConfig(value: unknown): VesperConfigResponse {
+ }
+ 
+ function activate(nextConfig: VesperConfigResponse): void {
+-  developerAciHashes = new Set(nextConfig.developerAciHashes);
++  setVesperAuthorAciHashes(nextConfig.developerAciHashes);
+   flagOverrides = new Map(
+     nextConfig.flagOverrides.map(({ name, value }) => [name, value])
+   );
+@@ -158,12 +161,13 @@ export function isVesperDeveloper({
+   serviceId,
+ }: Readonly<{ serviceId?: ServiceIdString | null }>): boolean {
+   return (
+-    isAciString(serviceId) && developerAciHashes.has(hashVesperAci(serviceId))
++    isAciString(serviceId) &&
++    getVesperAuthorAciHashes().has(hashVesperAci(serviceId))
+   );
+ }
+ 
+ export function getVesperDeveloperAciHashes(): ReadonlySet<string> {
+-  return developerAciHashes;
++  return getVesperAuthorAciHashes();
+ }
+ 
+ export function getVesperConfigFlagOverride(name: string): FlagOverrideResult {
+diff --git a/ts/background.preload.ts b/ts/background.preload.ts
+index 08cba85c0..c201e33d4 100644
+--- a/ts/background.preload.ts
++++ b/ts/background.preload.ts
+@@ -569,16 +569,20 @@ async function startApp(): Promise<void> {
+       storage: itemStorage,
+     });
+     drop(
+-      maybeRefreshVesperConfig({
+-        aci: itemStorage.user.getAci(),
+-        isInternalUser: isRemoteConfigValueEnabled('desktop.internalUser'),
+-        storage: itemStorage,
+-      }).catch(error => {
+-        log.warn(
+-          'Unable to refresh cached Vesper config',
+-          Errors.toLogFormat(error)
+-        );
+-      })
++      (async () => {
++        try {
++          await maybeRefreshVesperConfig({
++            aci: itemStorage.user.getAci(),
++            isInternalUser: isRemoteConfigValueEnabled('desktop.internalUser'),
++            storage: itemStorage,
++          });
++        } catch (error) {
++          log.warn(
++            'Unable to refresh cached Vesper config',
++            Errors.toLogFormat(error)
++          );
++        }
++      })()
+     );
+ 
+     MessageCache.install();
+diff --git a/ts/components/StoryListItem.dom.tsx b/ts/components/StoryListItem.dom.tsx
+index 10808f9bf..d0b2eb2f7 100644
+--- a/ts/components/StoryListItem.dom.tsx
++++ b/ts/components/StoryListItem.dom.tsx
+@@ -21,7 +21,7 @@ import { StoryImage } from './StoryImage.dom.tsx';
+ import { getAvatarColor } from '../types/Colors.std.ts';
+ import { OfficialChatInlineBadge } from './conversation/OfficialChatInlineBadge.dom.tsx';
+ import { AxoConfirmDialog } from '../axo/AxoConfirmDialog.dom.tsx';
+-import { isVesperAuthor } from '../util/isVesperAuthor.std.ts';
++import { isVesperAuthor } from '../util/isVesperAuthor.dom.ts';
+ 
+ export type PropsType = Pick<ConversationStoryType, 'group' | 'isHidden'> & {
+   conversationId: string;
+diff --git a/ts/components/VesperTitleBar.dom.tsx b/ts/components/VesperTitleBar.dom.tsx
+index e23bf8af4..c59713d33 100644
+--- a/ts/components/VesperTitleBar.dom.tsx
++++ b/ts/components/VesperTitleBar.dom.tsx
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import type {
+diff --git a/ts/components/conversation/AboutContactModal.dom.tsx b/ts/components/conversation/AboutContactModal.dom.tsx
+index 8db52fb59..4962af1f1 100644
+--- a/ts/components/conversation/AboutContactModal.dom.tsx
++++ b/ts/components/conversation/AboutContactModal.dom.tsx
+@@ -23,7 +23,7 @@ import type { ConversationType } from '../../state/ducks/conversations.preload.t
+ import type { LocalizerType } from '../../types/Util.std.ts';
+ import { Emoji } from '../../axo/emoji.std.ts';
+ import { OfficialChatInlineBadge } from './OfficialChatInlineBadge.dom.tsx';
+-import { isVesperAuthor } from '../../util/isVesperAuthor.std.ts';
++import { isVesperAuthor } from '../../util/isVesperAuthor.dom.ts';
+ 
+ function muted(parts: Array<string | JSX.Element>) {
+   return (
+diff --git a/ts/components/conversation/ContactName.dom.tsx b/ts/components/conversation/ContactName.dom.tsx
+index 4d21e7f16..bf7f781e5 100644
+--- a/ts/components/conversation/ContactName.dom.tsx
++++ b/ts/components/conversation/ContactName.dom.tsx
+@@ -19,7 +19,7 @@ import { UserText } from '../UserText.dom.tsx';
+ import { OfficialChatInlineBadge } from './OfficialChatInlineBadge.dom.tsx';
+ import { Emoji } from '../../axo/emoji.std.ts';
+ import type { ServiceIdString } from '../../types/ServiceId.std.ts';
+-import { isVesperAuthor } from '../../util/isVesperAuthor.std.ts';
++import { isVesperAuthor } from '../../util/isVesperAuthor.dom.ts';
+ 
+ export type ContactNameData = {
+   contactNameColor?: ContactNameColorType;
+diff --git a/ts/components/conversation/ConversationHeader.dom.tsx b/ts/components/conversation/ConversationHeader.dom.tsx
+index b393dfbcc..49744507e 100644
+--- a/ts/components/conversation/ConversationHeader.dom.tsx
++++ b/ts/components/conversation/ConversationHeader.dom.tsx
+@@ -53,7 +53,7 @@ import { OfficialChatInlineBadge } from './OfficialChatInlineBadge.dom.tsx';
+ import { AxoIconButton } from '../../axo/AxoIconButton.dom.tsx';
+ import { AxoButton } from '../../axo/AxoButton.dom.tsx';
+ import { AxoConfirmDialog } from '../../axo/AxoConfirmDialog.dom.tsx';
+-import { isVesperAuthor } from '../../util/isVesperAuthor.std.ts';
++import { isVesperAuthor } from '../../util/isVesperAuthor.dom.ts';
+ 
+ function HeaderInfoTitle({
+   name,
+diff --git a/ts/components/conversation/GroupV1Migration.dom.tsx b/ts/components/conversation/GroupV1Migration.dom.tsx
+index 96feaa005..a24e8d559 100644
+--- a/ts/components/conversation/GroupV1Migration.dom.tsx
++++ b/ts/components/conversation/GroupV1Migration.dom.tsx
+@@ -127,13 +127,10 @@ function renderUsers({
+     return null;
+   }
+ 
+-  if (members && count === 1) {
+-    // oxlint-disable-next-line typescript/no-non-null-assertion
++  const member = members?.[0];
++  if (member && count === 1) {
+     const contact = (
+-      <ContactName
+-        serviceId={members[0]!.serviceId}
+-        title={members[0]!.title}
+-      />
++      <ContactName serviceId={member.serviceId} title={member.title} />
+     );
+     return (
+       <p>
+diff --git a/ts/components/conversation/conversation-details/ConversationDetailsHeader.dom.tsx b/ts/components/conversation/conversation-details/ConversationDetailsHeader.dom.tsx
+index 451e88ca3..970da1f52 100644
+--- a/ts/components/conversation/conversation-details/ConversationDetailsHeader.dom.tsx
++++ b/ts/components/conversation/conversation-details/ConversationDetailsHeader.dom.tsx
+@@ -20,7 +20,7 @@ import type { ContactModalStateType } from '../../../types/globalModals.std.ts';
+ import { tw } from '../../../axo/tw.dom.tsx';
+ import { AxoSymbol } from '../../../axo/AxoSymbol.dom.tsx';
+ import { OfficialChatInlineBadge } from '../OfficialChatInlineBadge.dom.tsx';
+-import { isVesperAuthor } from '../../../util/isVesperAuthor.std.ts';
++import { isVesperAuthor } from '../../../util/isVesperAuthor.dom.ts';
+ 
+ export type Props = {
+   areWeASubscriber: boolean;
+diff --git a/ts/test-node/VesperConfig_test.dom.ts b/ts/test-node/VesperConfig_test.dom.ts
+index b9573af19..ee1a5e64f 100644
+--- a/ts/test-node/VesperConfig_test.dom.ts
++++ b/ts/test-node/VesperConfig_test.dom.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import { assert } from 'chai';
+@@ -95,7 +95,13 @@ describe('VesperConfig', () => {
+     };
+     let requestedUrl: string | undefined;
+     const fetchFn: typeof fetch = async input => {
+-      requestedUrl = String(input);
++      if (typeof input === 'string') {
++        requestedUrl = input;
++      } else if (input instanceof URL) {
++        requestedUrl = input.href;
++      } else {
++        requestedUrl = input.url;
++      }
+       return Response.json(
+         {
+           schemaVersion: 1,
+diff --git a/ts/test-node/util/isVesperAuthor_test.std.ts b/ts/test-node/util/isVesperAuthor_test.dom.ts
+similarity index 93%
+rename from ts/test-node/util/isVesperAuthor_test.std.ts
+rename to ts/test-node/util/isVesperAuthor_test.dom.ts
+index 4aefbc2de..e5f7c7205 100644
+--- a/ts/test-node/util/isVesperAuthor_test.std.ts
++++ b/ts/test-node/util/isVesperAuthor_test.dom.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import { assert } from 'chai';
+@@ -8,7 +8,7 @@ import {
+   generateAci,
+   generatePni,
+ } from '../../test-helpers/serviceIdUtils.std.ts';
+-import { isVesperAuthor } from '../../util/isVesperAuthor.std.ts';
++import { isVesperAuthor } from '../../util/isVesperAuthor.dom.ts';
+ import {
+   hashVesperAci,
+   restoreVesperConfigFromStorage,
+diff --git a/ts/test-node/util/vesperDeleteForEveryone_test.std.ts b/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
+index 62e2d0e2f..1f89aa53e 100644
+--- a/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
++++ b/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import { assert } from 'chai';
+diff --git a/ts/test-node/util/vesperProtocol_test.std.ts b/ts/test-node/util/vesperProtocol_test.std.ts
+index 3423e7b92..cea47c92e 100644
+--- a/ts/test-node/util/vesperProtocol_test.std.ts
++++ b/ts/test-node/util/vesperProtocol_test.std.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import { assert } from 'chai';
+diff --git a/ts/util/isVesperAuthor.std.ts b/ts/util/isVesperAuthor.dom.ts
+similarity index 89%
+rename from ts/util/isVesperAuthor.std.ts
+rename to ts/util/isVesperAuthor.dom.ts
+index cfc9c50d9..8a4d5380d 100644
+--- a/ts/util/isVesperAuthor.std.ts
++++ b/ts/util/isVesperAuthor.dom.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import type { ServiceIdString } from '../types/ServiceId.std.ts';
+diff --git a/ts/util/lint/license_comments.node.ts b/ts/util/lint/license_comments.node.ts
+index a66b9525b..d720e0fbc 100644
+--- a/ts/util/lint/license_comments.node.ts
++++ b/ts/util/lint/license_comments.node.ts
+@@ -190,7 +190,7 @@ async function main() {
+ 
+     if (
+       firstLine == null ||
+-      !/Copyright \d{4} Signal Messenger, LLC/.test(firstLine)
++      !/Copyright \d{4} (?:Signal Messenger, LLC|amber)/.test(firstLine)
+     ) {
+       const commit = await getCommitFileWasAdded(file);
+       warnings.push(
+diff --git a/ts/util/vesperDeleteForEveryone.std.ts b/ts/util/vesperDeleteForEveryone.std.ts
+index 7d611b62f..ad7629641 100644
+--- a/ts/util/vesperDeleteForEveryone.std.ts
++++ b/ts/util/vesperDeleteForEveryone.std.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ export function shouldKeepDeletedMessage({
+diff --git a/ts/util/vesperProtocol.std.ts b/ts/util/vesperProtocol.std.ts
+index 7bfe161da..3eec7d396 100644
+--- a/ts/util/vesperProtocol.std.ts
++++ b/ts/util/vesperProtocol.std.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ const VESPER_PROTOCOL_SCHEME = 'vesper';

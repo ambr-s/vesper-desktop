@@ -51,8 +51,16 @@ expect(
   "Linux window class",
 );
 expect(
+  JSON.stringify(packageJson.build.linux.target),
+  JSON.stringify([
+    { target: "deb", arch: "x64" },
+    { target: "AppImage", arch: "x64" },
+  ]),
+  "Linux package targets",
+);
+expect(
   packageJson.build.protocols.schemes.join(","),
-  "vesper,vespercaptcha",
+  "vesper,vespercaptcha,sgnl",
   "protocol schemes",
 );
 
@@ -71,12 +79,12 @@ expect(
 );
 expect(
   configuration.challengeUrl,
-  "https://vspdb.asy.st/captcha/challenge/generate.html",
+  "https://vsp.asy.st/captcha/challenge/generate.html",
   "chat captcha URL",
 );
 expect(
   production.registrationChallengeUrl,
-  "https://vspdb.asy.st/captcha/registration/generate.html",
+  "https://vsp.asy.st/captcha/registration/generate.html",
   "registration captcha URL",
 );
 

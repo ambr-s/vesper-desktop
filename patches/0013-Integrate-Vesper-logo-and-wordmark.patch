@@ -1,0 +1,77 @@
+From 6dffa315b0f7aac982f73625cbac442c800f5c36 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sun, 26 Jul 2026 18:01:07 +0100
+Subject: [PATCH 13/16] Integrate Vesper logo and wordmark
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ .../components/InstallScreenSignalLogo.scss   |  2 +-
+ stylesheets/components/VesperTitleBar.scss    | 20 +++++++++++--------
+ ts/components/VesperTitleBar.dom.tsx          |  7 +------
+ 3 files changed, 14 insertions(+), 15 deletions(-)
+
+diff --git a/stylesheets/components/InstallScreenSignalLogo.scss b/stylesheets/components/InstallScreenSignalLogo.scss
+index d1e782094..ae2fe666b 100644
+--- a/stylesheets/components/InstallScreenSignalLogo.scss
++++ b/stylesheets/components/InstallScreenSignalLogo.scss
+@@ -23,7 +23,7 @@
+       content: '';
+       display: block;
+       height: 32px;
+-      width: 112px;
++      width: 98px;
+     }
+   }
+ }
+diff --git a/stylesheets/components/VesperTitleBar.scss b/stylesheets/components/VesperTitleBar.scss
+index 717a84bb5..c0c7175f0 100644
+--- a/stylesheets/components/VesperTitleBar.scss
++++ b/stylesheets/components/VesperTitleBar.scss
+@@ -19,17 +19,21 @@
+   &__identity {
+     align-items: center;
+     display: flex;
+-    flex: 0 0 102px;
+-    font-size: 13px;
+-    font-weight: 600;
+-    gap: 7px;
+-    letter-spacing: 0.01em;
++    flex: 0 0 92px;
+     padding-inline: 12px 8px;
+   }
+ 
+-  &__logo {
+-    height: 18px;
+-    width: 18px;
++  &__wordmark {
++    -webkit-mask: url('../images/vesper-wordmark.svg') no-repeat center;
++    -webkit-mask-size: contain;
++    background-color: currentColor;
++    display: block;
++    height: 20px;
++    width: 60px;
++
++    @media (forced-colors: active) {
++      background-color: CanvasText;
++    }
+   }
+ 
+   &__menus {
+diff --git a/ts/components/VesperTitleBar.dom.tsx b/ts/components/VesperTitleBar.dom.tsx
+index 5215e2245..c5ed30928 100644
+--- a/ts/components/VesperTitleBar.dom.tsx
++++ b/ts/components/VesperTitleBar.dom.tsx
+@@ -112,12 +112,7 @@ export function VesperTitleBar({ isMaximized }: PropsType): JSX.Element {
+         }}
+       >
+         <div className="VesperTitleBar__identity" aria-label="Vesper">
+-          <img
+-            className="VesperTitleBar__logo"
+-            src="images/vesper-logo.svg"
+-            alt=""
+-          />
+-          <span>Vesper</span>
++          <span className="VesperTitleBar__wordmark" aria-hidden="true" />
+         </div>
+ 
+         <nav

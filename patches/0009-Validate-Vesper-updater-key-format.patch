@@ -1,8 +1,9 @@
-From dfcaad24c160121810e56f6bcc19ebaa9799c820 Mon Sep 17 00:00:00 2001
+From 546040c4c912f0864f8251285c3272cbd2b457fb Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 20:47:15 +0100
-Subject: [PATCH 09/12] Validate Vesper updater key format
+Subject: [PATCH 09/16] Validate Vesper updater key format
 
+Signed-off-by: amber <amber@flourish.ch>
 ---
  ts/test-node/updater/curve_test.node.ts | 18 ++----------------
  1 file changed, 2 insertions(+), 16 deletions(-)

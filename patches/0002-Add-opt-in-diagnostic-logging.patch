@@ -1,11 +1,13 @@
-From 45e03a83c01afecf9c8c2ae524690af7ae123356 Mon Sep 17 00:00:00 2001
+From 813578a045cbe48da69e50c8900d701a101027a6 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:49:16 +0100
-Subject: [PATCH 02/12] Add opt-in diagnostic logging
+Subject: [PATCH 02/16] Add opt-in diagnostic logging
 
 Keep logging disabled by default, apply changes without a restart, clear local logs and crash reports when disabled, and disable the Debug Log menu item while no logs are being collected.
 
 Adapted from Molly work by Oscar Mira and other Molly contributors.
+
+Signed-off-by: amber <amber@flourish.ch>
 ---
  _locales/en/messages.json                     | 24 +++++++++++
  app/main.main.ts                              | 20 ++++++++-

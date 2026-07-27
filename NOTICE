@@ -80,5 +80,14 @@ built payload, launcher text and update configuration. The Vesper AppStream
 metadata is also CC0-1.0.
 
 Vesper's original Desktop code, scripts and artwork are copyright their Vesper
-contributors and are licensed AGPL-3.0-only. Other dependencies and notices
-come from the pinned Signal Desktop source and remain under their own licences.
+contributors and are licensed AGPL-3.0-only.
+
+The Vesper wordmark uses outlined letterforms derived from Newsreader:
+https://github.com/productiontype/Newsreader
+
+Newsreader is copyright 2020 The Newsreader Project Authors and is licensed
+under the SIL Open Font License, Version 1.1. The wordmark contains converted
+outlines rather than redistributed font software.
+
+Other dependencies and notices come from the pinned Signal Desktop source and
+remain under their own licences.
