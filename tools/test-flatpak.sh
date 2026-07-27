@@ -8,6 +8,7 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$ROOT/work"
 APP_ID="systems.amber.Vesper"
 BUILD_DIR="$ROOT/artifacts/flatpak/build"
+SMOKE_SECONDS=60
 
 if (($#)); then
   echo "Usage: $0" >&2
@@ -110,7 +111,7 @@ run_smoke() {
   local smoke_status
 
   set +e
-  timeout --signal=TERM --kill-after=5s 20s \
+  timeout --signal=TERM --kill-after=5s "${SMOKE_SECONDS}s" \
     xvfb-run \
       --auto-servernum \
       --server-args='-screen 0 1280x720x24 -nolisten tcp -ac' \
@@ -133,14 +134,28 @@ run_smoke() {
 
 run_smoke "$SMOKE_LOG_FIRST"
 
+# The dollar expression belongs to the JavaScript template literal.
+# shellcheck disable=SC2016
 node -e '
   const config = require(process.argv[1]);
+  const details = {
+    safeStorageBackend: config.safeStorageBackend,
+    encryptedKeyType: typeof config.encryptedKey,
+    encryptedKeyLength:
+      typeof config.encryptedKey === "string"
+        ? config.encryptedKey.length
+        : undefined,
+    hasPlaintextKey: Object.hasOwn(config, "key"),
+  };
   if (
     config.safeStorageBackend !== "gnome_libsecret" ||
     typeof config.encryptedKey !== "string" ||
     !/^[0-9a-f]+$/u.test(config.encryptedKey) ||
     Object.hasOwn(config, "key")
   ) {
+    console.error(
+      `Unexpected Flatpak database-key configuration: ${JSON.stringify(details)}`
+    );
     process.exit(1);
   }
 ' "$SMOKE_ROOT/Vesper/config.json"
@@ -162,4 +177,4 @@ fi
 
 echo "Verified $APP_ID bundle contents with Electron $ELECTRON_VERSION."
 echo "Verified encrypted gnome-libsecret storage with no plaintext SQL key."
-echo "The Flatpak remained live across two 20-second smoke tests."
+echo "The Flatpak remained live across two ${SMOKE_SECONDS}-second smoke tests."
