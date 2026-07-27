@@ -18,6 +18,18 @@ command -v flatpak >/dev/null || {
   echo "flatpak is required." >&2
   exit 1
 }
+command -v dbus-run-session >/dev/null || {
+  echo "dbus-run-session is required. On Ubuntu: sudo apt-get install dbus-daemon" >&2
+  exit 1
+}
+command -v gdbus >/dev/null || {
+  echo "gdbus is required. On Ubuntu: sudo apt-get install libglib2.0-bin" >&2
+  exit 1
+}
+command -v gnome-keyring-daemon >/dev/null || {
+  echo "gnome-keyring-daemon is required. On Ubuntu: sudo apt-get install gnome-keyring" >&2
+  exit 1
+}
 command -v strings >/dev/null || {
   echo "strings is required." >&2
   exit 1
@@ -102,7 +114,8 @@ run_smoke() {
     xvfb-run \
       --auto-servernum \
       --server-args='-screen 0 1280x720x24 -nolisten tcp -ac' \
-      bash "$ROOT/tools/run-flatpak-smoke-under-xvfb.sh" \
+      dbus-run-session -- \
+        bash "$ROOT/tools/run-flatpak-smoke-under-xvfb.sh" \
         "$BUILD_DIR" \
         "$SMOKE_ROOT" >"$log_file" 2>&1
   smoke_status=$?

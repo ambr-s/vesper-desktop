@@ -50,10 +50,24 @@ jobs:
 
       - name: Install Linux build dependencies
         run: |
-          sudo apt-get install -y xvfb libpulse0 flatpak flatpak-builder ||
+          sudo apt-get install -y \
+            dbus-daemon \
+            flatpak \
+            flatpak-builder \
+            gnome-keyring \
+            libglib2.0-bin \
+            libpulse0 \
+            xvfb ||
             (
               sudo apt-get update &&
-              sudo apt-get install -y xvfb libpulse0 flatpak flatpak-builder
+              sudo apt-get install -y \
+                dbus-daemon \
+                flatpak \
+                flatpak-builder \
+                gnome-keyring \
+                libglib2.0-bin \
+                libpulse0 \
+                xvfb
             )
 
       - name: Build and validate Vesper
