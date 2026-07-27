@@ -95,6 +95,12 @@ SMOKE_ROOT="$(mktemp -d "$SMOKE_ROOT_PARENT/vesper-flatpak-smoke.XXXXXXXX")"
 SMOKE_LOG_FIRST="$(mktemp "${TMPDIR:-/tmp}/vesper-flatpak-smoke-first.XXXXXXXX")"
 SMOKE_LOG_SECOND="$(mktemp "${TMPDIR:-/tmp}/vesper-flatpak-smoke-second.XXXXXXXX")"
 PROBLEM_LOG="$(mktemp "${TMPDIR:-/tmp}/vesper-flatpak-problems.XXXXXXXX")"
+DEFAULT_FLATPAK_USER_DIR="$(
+  realpath -m \
+    "${FLATPAK_USER_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/flatpak}"
+)"
+export FLATPAK_USER_DIR="$SMOKE_ROOT_PARENT/flatpak-user"
+export FLATPAK_SYSTEM_DIR="$DEFAULT_FLATPAK_USER_DIR"
 cleanup() {
   find \
     "$SMOKE_LOG_FIRST" \
@@ -106,6 +112,13 @@ cleanup() {
   find "$SMOKE_ROOT_PARENT" -depth -delete
 }
 trap cleanup EXIT
+
+flatpak install \
+  --user \
+  --noninteractive \
+  --no-deps \
+  "$BUNDLE"
+flatpak info --user "$APP_ID" >/dev/null
 
 run_smoke() {
   local log_file="$1"
@@ -121,7 +134,7 @@ run_smoke() {
       --server-args='-screen 0 1280x720x24 -nolisten tcp -ac' \
       dbus-run-session -- \
         bash "$ROOT/tools/run-flatpak-smoke-under-xvfb.sh" \
-        "$BUILD_DIR" \
+        "$APP_ID" \
         "$SMOKE_ROOT" \
         "$mode" \
         "$smoke_seconds" >"$log_file" 2>&1

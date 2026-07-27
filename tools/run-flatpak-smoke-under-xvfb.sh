@@ -5,11 +5,11 @@
 set -euo pipefail
 
 if (($# != 4)); then
-  echo "Usage: $0 BUILD_DIR SMOKE_ROOT MODE SECONDS" >&2
+  echo "Usage: $0 APP_ID SMOKE_ROOT MODE SECONDS" >&2
   exit 2
 fi
 
-BUILD_DIR="$1"
+APP_ID="$1"
 SMOKE_ROOT="$2"
 MODE="$3"
 SMOKE_SECONDS="$4"
@@ -25,6 +25,10 @@ esac
 [[ "$SMOKE_SECONDS" =~ ^[1-9][0-9]*$ ]] || {
   echo "Smoke duration must be a positive integer." >&2
   exit 2
+}
+flatpak info --user "$APP_ID" >/dev/null || {
+  echo "Flatpak app is not installed: $APP_ID" >&2
+  exit 1
 }
 [[ "${DISPLAY:-}" =~ ^:[0-9]+$ ]] || {
   echo "Expected an Xvfb DISPLAY; found ${DISPLAY:-unset}." >&2
@@ -120,24 +124,18 @@ stop_app() {
 trap stop_app EXIT
 trap 'exit 124' INT TERM
 
-# Expand the final command's variables inside the Flatpak sandbox.
-# shellcheck disable=SC2016
-flatpak build \
+flatpak run \
+  --user \
   --die-with-parent \
-  --readonly \
-  --share=ipc \
-  --share=network \
-  --socket=session-bus \
-  --bind-mount=/tmp/.X11-unix=/tmp/.X11-unix \
+  --branch=stable \
+  --no-documents-portal \
+  --no-a11y-bus \
+  --socket=x11 \
+  --nosocket=wayland \
   --filesystem="$SMOKE_ROOT_PARENT" \
-  --env="VESPER_TEST_DISPLAY=$DISPLAY" \
   --env=VESPER_DISABLE_GPU=1 \
-  "$BUILD_DIR" \
-  sh -c '
-    export DISPLAY="$VESPER_TEST_DISPLAY"
-    exec /app/bin/vesper-desktop "$@"
-  ' \
-  sh \
+  "$APP_ID" \
+  --ozone-platform=x11 \
   "--user-data-dir=$SMOKE_ROOT/Vesper" \
   --start-in-tray &
 APP_PID=$!
