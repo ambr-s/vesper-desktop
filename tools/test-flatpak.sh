@@ -8,7 +8,8 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$ROOT/work"
 APP_ID="systems.amber.Vesper"
 BUILD_DIR="$ROOT/artifacts/flatpak/build"
-SMOKE_SECONDS=60
+SMOKE_READY_TIMEOUT_SECONDS=180
+SMOKE_RESTART_SECONDS=30
 
 if (($#)); then
   echo "Usage: $0" >&2
@@ -108,21 +109,26 @@ trap cleanup EXIT
 
 run_smoke() {
   local log_file="$1"
+  local mode="$2"
+  local smoke_seconds="$3"
   local smoke_status
+  local hard_timeout_seconds=$((smoke_seconds + 30))
 
   set +e
-  timeout --signal=TERM --kill-after=5s "${SMOKE_SECONDS}s" \
+  timeout --signal=TERM --kill-after=5s "${hard_timeout_seconds}s" \
     xvfb-run \
       --auto-servernum \
       --server-args='-screen 0 1280x720x24 -nolisten tcp -ac' \
       dbus-run-session -- \
         bash "$ROOT/tools/run-flatpak-smoke-under-xvfb.sh" \
         "$BUILD_DIR" \
-        "$SMOKE_ROOT" >"$log_file" 2>&1
+        "$SMOKE_ROOT" \
+        "$mode" \
+        "$smoke_seconds" >"$log_file" 2>&1
   smoke_status=$?
   set -e
 
-  if [[ "$smoke_status" -ne 124 && "$smoke_status" -ne 137 ]]; then
+  if [[ "$smoke_status" -ne 0 ]]; then
     printf 'Flatpak exited unexpectedly with status %s.\n' \
       "$smoke_status" >&2
     sed -n '1,260p' "$log_file" >&2
@@ -159,9 +165,15 @@ read_encrypted_key() {
   ' "$SMOKE_ROOT/Vesper/config.json"
 }
 
-run_smoke "$SMOKE_LOG_FIRST"
+run_smoke \
+  "$SMOKE_LOG_FIRST" \
+  await-config \
+  "$SMOKE_READY_TIMEOUT_SECONDS"
 ENCRYPTED_KEY_FIRST="$(read_encrypted_key)"
-run_smoke "$SMOKE_LOG_SECOND"
+run_smoke \
+  "$SMOKE_LOG_SECOND" \
+  keep-alive \
+  "$SMOKE_RESTART_SECONDS"
 ENCRYPTED_KEY_SECOND="$(read_encrypted_key)"
 if [[ "$ENCRYPTED_KEY_SECOND" != "$ENCRYPTED_KEY_FIRST" ]]; then
   echo "Flatpak database key changed between launches." >&2
@@ -183,4 +195,4 @@ fi
 
 echo "Verified $APP_ID bundle contents with Electron $ELECTRON_VERSION."
 echo "Verified encrypted gnome-libsecret storage with no plaintext SQL key."
-echo "The Flatpak remained live across two ${SMOKE_SECONDS}-second smoke tests."
+echo "The Flatpak initialized and remained live after an encrypted restart."

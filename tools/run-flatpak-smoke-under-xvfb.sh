@@ -4,15 +4,28 @@
 
 set -euo pipefail
 
-if (($# != 2)); then
-  echo "Usage: $0 BUILD_DIR SMOKE_ROOT" >&2
+if (($# != 4)); then
+  echo "Usage: $0 BUILD_DIR SMOKE_ROOT MODE SECONDS" >&2
   exit 2
 fi
 
 BUILD_DIR="$1"
 SMOKE_ROOT="$2"
+MODE="$3"
+SMOKE_SECONDS="$4"
 SMOKE_ROOT_PARENT="$(dirname -- "$SMOKE_ROOT")"
 
+case "$MODE" in
+  await-config | keep-alive) ;;
+  *)
+    echo "Unknown smoke mode: $MODE" >&2
+    exit 2
+    ;;
+esac
+[[ "$SMOKE_SECONDS" =~ ^[1-9][0-9]*$ ]] || {
+  echo "Smoke duration must be a positive integer." >&2
+  exit 2
+}
 [[ "${DISPLAY:-}" =~ ^:[0-9]+$ ]] || {
   echo "Expected an Xvfb DISPLAY; found ${DISPLAY:-unset}." >&2
   exit 1
@@ -26,10 +39,13 @@ KEYRING_ROOT="$(
   mktemp -d "$SMOKE_ROOT_PARENT/vesper-keyring.XXXXXXXX"
 )"
 KEYRING_CONTROL="$KEYRING_ROOT/control"
-KEYRING_DATA="$KEYRING_ROOT/data"
+KEYRING_DATA="$SMOKE_ROOT_PARENT/vesper-keyring-data"
 KEYRING_LOGIN_LOG="$KEYRING_ROOT/login.log"
 KEYRING_START_LOG="$KEYRING_ROOT/start.log"
-mkdir -m 700 "$KEYRING_CONTROL" "$KEYRING_DATA"
+mkdir -m 700 "$KEYRING_CONTROL"
+if [[ ! -d "$KEYRING_DATA" ]]; then
+  mkdir -m 700 "$KEYRING_DATA"
+fi
 unset GNOME_KEYRING_CONTROL SSH_AUTH_SOCK
 printf '\n' |
   XDG_DATA_HOME="$KEYRING_DATA" \
@@ -79,6 +95,31 @@ if [[ "$KEYRING_DEFAULT_ALIAS" == "(objectpath '/',)" ]]; then
   exit 1
 fi
 
+APP_PID=
+stop_app() {
+  local status=$?
+
+  trap - EXIT INT TERM
+  if [[ -n "$APP_PID" ]] && kill -0 "$APP_PID" 2>/dev/null; then
+    kill -TERM "$APP_PID" 2>/dev/null || true
+    for _ in {1..50}; do
+      if ! kill -0 "$APP_PID" 2>/dev/null; then
+        break
+      fi
+      sleep 0.1
+    done
+    if kill -0 "$APP_PID" 2>/dev/null; then
+      kill -KILL "$APP_PID" 2>/dev/null || true
+    fi
+  fi
+  if [[ -n "$APP_PID" ]]; then
+    wait "$APP_PID" 2>/dev/null || true
+  fi
+  exit "$status"
+}
+trap stop_app EXIT
+trap 'exit 124' INT TERM
+
 # Expand the final command's variables inside the Flatpak sandbox.
 # shellcheck disable=SC2016
 flatpak build \
@@ -98,4 +139,28 @@ flatpak build \
   ' \
   sh \
   "--user-data-dir=$SMOKE_ROOT/Vesper" \
-  --start-in-tray
+  --start-in-tray &
+APP_PID=$!
+
+for ((attempt = 0; attempt < SMOKE_SECONDS * 4; attempt += 1)); do
+  if ! kill -0 "$APP_PID" 2>/dev/null; then
+    set +e
+    wait "$APP_PID"
+    app_status=$?
+    set -e
+    APP_PID=
+    echo "Flatpak process exited early with status $app_status." >&2
+    exit 1
+  fi
+
+  if [[ "$MODE" == await-config && -f "$SMOKE_ROOT/Vesper/config.json" ]]; then
+    exit 0
+  fi
+  sleep 0.25
+done
+
+if [[ "$MODE" == await-config ]]; then
+  echo "Flatpak did not create config.json within ${SMOKE_SECONDS}s." >&2
+  find "$SMOKE_ROOT" -maxdepth 2 -type f -printf '%P\n' >&2
+  exit 1
+fi
