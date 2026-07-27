@@ -7,20 +7,20 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: vesper-desktop-release
   cancel-in-progress: false
 
 jobs:
-  linux:
-    name: Publish Linux x64
-    runs-on: blacksmith-8vcpu-ubuntu-2404
-    timeout-minutes: 90
+  verify:
+    name: Verify Linux release input
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 20
     environment: release
-    env:
-      R2_BUCKET: vesper-desktop-updates
+    outputs:
+      version: ${{ steps.release.outputs.version }}
 
     steps:
       - name: Check out Vesper patchset
@@ -31,6 +31,8 @@ jobs:
       - name: Check release secrets
         env:
           UPDATE_PRIVATE_KEY: ${{ secrets.VESPER_DESKTOP_UPDATE_PRIVATE_KEY }}
+          APPIMAGE_UPDATE_PRIVATE_KEY: ${{ secrets.VESPER_DESKTOP_APPIMAGE_UPDATE_PRIVATE_KEY }}
+          LINUX_REPOSITORY_PRIVATE_KEY: ${{ secrets.VESPER_DESKTOP_LINUX_REPOSITORY_PRIVATE_KEY }}
           R2_ACCOUNT_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.VESPER_DESKTOP_R2_SECRET_ACCESS_KEY }}
@@ -38,6 +40,8 @@ jobs:
           missing=()
           for name in \
             UPDATE_PRIVATE_KEY \
+            APPIMAGE_UPDATE_PRIVATE_KEY \
+            LINUX_REPOSITORY_PRIVATE_KEY \
             R2_ACCOUNT_ID \
             R2_ACCESS_KEY_ID \
             R2_SECRET_ACCESS_KEY; do
@@ -51,82 +55,19 @@ jobs:
       - name: Materialise Vesper
         run: ./tools/materialize.sh
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          package_json_file: work/package.json
-
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: work/.nvmrc
-          cache: pnpm
-          cache-dependency-path: work/pnpm-lock.yaml
 
-      - name: Cache Electron native builds
-        uses: actions/cache@v5
-        with:
-          path: ~/.electron-gyp
-          key: electron-gyp-${{ runner.os }}-${{ hashFiles('work/pnpm-lock.yaml') }}
-
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get install -y xvfb libpulse0 flatpak flatpak-builder ||
-            (
-              sudo apt-get update &&
-              sudo apt-get install -y xvfb libpulse0 flatpak flatpak-builder
-            )
-
-      - name: Build and validate Vesper
-        run: ./tools/build-local.sh
-
-      - name: Check release identity
+      - name: Verify release identity
         run: node tools/verify-identity.mjs --release work
 
-      - name: Build and test Flatpak
-        run: |
-          ./tools/build-flatpak.sh
-          ./tools/test-flatpak.sh
-
-      - name: Locate update files
-        id: update
-        run: |
-          mapfile -t packages < <(
-            find work/release -maxdepth 1 -type f -name '*.deb' | sort
-          )
-          if [[ "${#packages[@]}" -ne 1 ]]; then
-            printf 'Expected one Debian package, found %s.\n' "${#packages[@]}" >&2
-            exit 1
-          fi
-          manifest=work/release/latest-linux.yml
-          [[ -f "$manifest" ]] || {
-            echo "Missing $manifest" >&2
-            exit 1
-          }
-          mapfile -t flatpaks < <(
-            find artifacts/flatpak \
-              -maxdepth 1 \
-              -type f \
-              -name '*.flatpak' |
-              sort
-          )
-          if [[ "${#flatpaks[@]}" -ne 1 ]]; then
-            printf 'Expected one Flatpak bundle, found %s.\n' \
-              "${#flatpaks[@]}" >&2
-            exit 1
-          fi
-          {
-            echo "package=${packages[0]}"
-            echo "manifest=$manifest"
-            echo "flatpak=${flatpaks[0]}"
-            echo "version=$(node -p "require('./work/package.json').version")"
-          } >> "$GITHUB_OUTPUT"
-
       - name: Verify signed release tag
-        env:
-          VERSION: ${{ steps.update.outputs.version }}
+        id: release
         run: |
-          tag="v$VERSION"
+          version="$(node -p "require('./work/package.json').version")"
+          tag="v$version"
           expected_ref="refs/tags/$tag"
           if [[ "$GITHUB_REF" != "$expected_ref" ]]; then
             echo "Dispatch this workflow from $expected_ref, not $GITHUB_REF." >&2
@@ -149,97 +90,435 @@ jobs:
             echo "Remote $expected_ref does not match the verified local tag." >&2
             exit 1
           fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Sign and verify update
+  linux:
+    name: Build Linux x64
+    needs: verify
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    timeout-minutes: 90
+    environment: release
+
+    steps:
+      - name: Check out Vesper patchset
+        uses: actions/checkout@v7
+
+      - name: Materialise Vesper
+        run: ./tools/materialize.sh
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: work/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: work/.nvmrc
+          cache: pnpm
+          cache-dependency-path: work/pnpm-lock.yaml
+
+      - name: Cache Electron native builds
+        uses: actions/cache@v6
+        with:
+          path: ~/.electron-gyp
+          key: electron-gyp-${{ runner.os }}-${{ hashFiles('work/pnpm-lock.yaml') }}
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get install -y \
+            apt-utils \
+            flatpak \
+            flatpak-builder \
+            gnupg \
+            libpulse0 \
+            xvfb ||
+            (
+              sudo apt-get update &&
+              sudo apt-get install -y \
+                apt-utils \
+                flatpak \
+                flatpak-builder \
+                gnupg \
+                libpulse0 \
+                xvfb
+            )
+
+      - name: Build and validate Vesper
+        run: ./tools/build-local.sh
+
+      - name: Build and test Flatpak
+        run: |
+          ./tools/build-flatpak.sh
+          ./tools/test-flatpak.sh
+
+      - name: Locate Linux packages
+        id: packages
+        run: |
+          mapfile -t debs < <(
+            find work/release -maxdepth 1 -type f -name '*.deb' | sort
+          )
+          mapfile -t appimages < <(
+            find work/release -maxdepth 1 -type f -name '*.AppImage' | sort
+          )
+          if [[ "${#debs[@]}" -ne 1 || "${#appimages[@]}" -ne 1 ]]; then
+            echo "Expected one Debian package and one AppImage." >&2
+            exit 1
+          fi
+          test -f "${appimages[0]}.blockmap"
+          test -f work/release/latest-linux.yml
+          {
+            echo "deb=${debs[0]}"
+            echo "appimage=${appimages[0]}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Sign and verify Linux updates
         env:
           UPDATE_PRIVATE_KEY: ${{ secrets.VESPER_DESKTOP_UPDATE_PRIVATE_KEY }}
-          UPDATE_PACKAGE: ${{ steps.update.outputs.package }}
+          APPIMAGE_UPDATE_PRIVATE_KEY: ${{ secrets.VESPER_DESKTOP_APPIMAGE_UPDATE_PRIVATE_KEY }}
+          DEBIAN_PACKAGE: ${{ steps.packages.outputs.deb }}
+          APPIMAGE_PACKAGE: ${{ steps.packages.outputs.appimage }}
         run: |
-          key_file="$RUNNER_TEMP/vesper-desktop-update.key"
-          printf '%s' "$UPDATE_PRIVATE_KEY" > "$key_file"
+          update_key="$RUNNER_TEMP/vesper-desktop-update.key"
+          appimage_key="$RUNNER_TEMP/vesper-desktop-appimage-update.key"
+          printf '%s' "$UPDATE_PRIVATE_KEY" > "$update_key"
+          printf '%s' "$APPIMAGE_UPDATE_PRIVATE_KEY" > "$appimage_key"
+          deb="$PWD/$DEBIAN_PACKAGE"
+          appimage="$PWD/$APPIMAGE_PACKAGE"
           (
             cd work
             NODE_OPTIONS='--import=tsx' \
-              node ts/updater/signVesperUpdate.node.ts \
-                "../$UPDATE_PACKAGE" \
-                "$key_file"
+              node ts/updater/signVesperUpdate.node.ts "$deb" "$update_key"
             NODE_OPTIONS='--import=tsx' \
-              node ts/updater/verifyVesperUpdate.node.ts "../$UPDATE_PACKAGE"
+              node ts/updater/verifyVesperUpdate.node.ts "$deb"
+            NODE_OPTIONS='--import=tsx' \
+              node ts/updater/signVesperUpdate.node.ts \
+                "$appimage" \
+                "$appimage_key"
+            NODE_OPTIONS='--import=tsx' \
+              node ts/updater/verifyVesperUpdate.node.ts \
+                --appimage \
+                "$appimage"
           )
 
-      - name: Upload release artefacts
+      - name: Sign Debian and Flatpak repositories
+        env:
+          LINUX_REPOSITORY_PRIVATE_KEY: ${{ secrets.VESPER_DESKTOP_LINUX_REPOSITORY_PRIVATE_KEY }}
+          DEBIAN_PACKAGE: ${{ steps.packages.outputs.deb }}
+        run: |
+          gpg_home="$RUNNER_TEMP/vesper-linux-repository-gnupg"
+          key_file="$RUNNER_TEMP/vesper-linux-repository.asc"
+          mkdir -m 700 "$gpg_home"
+          printf '%s' "$LINUX_REPOSITORY_PRIVATE_KEY" > "$key_file"
+          gpg --batch --homedir "$gpg_home" --import "$key_file"
+          fingerprint="$(
+            gpg \
+              --batch \
+              --homedir "$gpg_home" \
+              --with-colons \
+              --list-secret-keys |
+              awk -F: '$1 == "fpr" { print $10; exit }'
+          )"
+          test -n "$fingerprint"
+          ./tools/prepare-linux-repositories.sh \
+            "$DEBIAN_PACKAGE" \
+            "$gpg_home" \
+            "$fingerprint"
+
+      - name: Stage Linux release files
+        env:
+          DEBIAN_PACKAGE: ${{ steps.packages.outputs.deb }}
+          APPIMAGE_PACKAGE: ${{ steps.packages.outputs.appimage }}
+        run: |
+          mkdir -p dist/desktop dist/flatpak
+          cp -a \
+            "$DEBIAN_PACKAGE" \
+            "$DEBIAN_PACKAGE.sig" \
+            "$APPIMAGE_PACKAGE" \
+            "$APPIMAGE_PACKAGE.sig" \
+            "$APPIMAGE_PACKAGE.blockmap" \
+            work/release/latest-linux.yml \
+            dist/desktop/
+          cp -a artifacts/apt dist/apt
+          cp -a \
+            artifacts/flatpak/vesper-desktop_*_x86_64.flatpak \
+            artifacts/flatpak/vesper.flatpakref \
+            artifacts/flatpak/vesper.flatpakrepo \
+            dist/flatpak/
+          cp -a artifacts/flatpak/repo dist/flatpak/repo
+
+      - name: Upload Linux release files
         uses: actions/upload-artifact@v7
         with:
-          name: vesper-desktop-${{ steps.update.outputs.version }}-linux-x64
-          path: |
-            ${{ steps.update.outputs.package }}
-            ${{ steps.update.outputs.package }}.sig
-            ${{ steps.update.outputs.manifest }}
-            ${{ steps.update.outputs.flatpak }}
+          name: vesper-release-linux-${{ needs.verify.outputs.version }}
+          path: dist
           if-no-files-found: error
+          retention-days: 7
 
-      - name: Publish package and metadata
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.VESPER_DESKTOP_R2_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-          R2_ACCOUNT_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCOUNT_ID }}
-          UPDATE_PACKAGE: ${{ steps.update.outputs.package }}
-          UPDATE_MANIFEST: ${{ steps.update.outputs.manifest }}
+      - name: Remove Linux signing material
+        if: always()
         run: |
-          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-          package_name="$(basename "$UPDATE_PACKAGE")"
-          aws s3 cp \
-            "$UPDATE_PACKAGE" \
-            "s3://$R2_BUCKET/desktop/$package_name" \
-            --endpoint-url "$endpoint" \
-            --cache-control 'public, max-age=31536000, immutable'
-          aws s3 cp \
-            "$UPDATE_PACKAGE.sig" \
-            "s3://$R2_BUCKET/desktop/$package_name.sig" \
-            --endpoint-url "$endpoint" \
-            --cache-control 'public, max-age=31536000, immutable' \
-            --content-type 'text/plain'
-          aws s3 cp \
-            "$UPDATE_MANIFEST" \
-            "s3://$R2_BUCKET/desktop/latest-linux.yml" \
-            --endpoint-url "$endpoint" \
-            --cache-control 'public, max-age=300' \
-            --content-type 'text/yaml'
-          for route in challenge registration; do
-            aws s3 cp \
-              release-site/captcha/generate.html \
-              "s3://$R2_BUCKET/captcha/$route/generate.html" \
-              --endpoint-url "$endpoint" \
-              --cache-control 'public, max-age=3600' \
-              --content-type 'text/html'
-          done
-          aws s3 cp \
-            release-site/captcha/vesper-captcha.js \
-            "s3://$R2_BUCKET/captcha/vesper-captcha.js" \
-            --endpoint-url "$endpoint" \
-            --cache-control 'public, max-age=3600' \
-            --content-type 'text/javascript'
+          find \
+            "$RUNNER_TEMP/vesper-desktop-update.key" \
+            "$RUNNER_TEMP/vesper-desktop-appimage-update.key" \
+            "$RUNNER_TEMP/vesper-linux-repository.asc" \
+            -maxdepth 0 \
+            -type f \
+            -delete 2>/dev/null || true
+          gpg_home="$RUNNER_TEMP/vesper-linux-repository-gnupg"
+          if [[ -d "$gpg_home" ]]; then
+            find "$gpg_home" -depth -delete
+          fi
+
+  publish:
+    name: Publish Linux release
+    needs:
+      - verify
+      - linux
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: write
+    env:
+      R2_BUCKET: vesper-desktop-updates
+
+    steps:
+      - name: Download Linux release files
+        uses: actions/download-artifact@v8
+        with:
+          name: vesper-release-linux-${{ needs.verify.outputs.version }}
+          path: staging
+
+      - name: Verify Linux release set
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          test "$(find staging/desktop -maxdepth 1 -type f -name '*.deb' | wc -l)" = 1
+          test "$(find staging/desktop -maxdepth 1 -type f -name '*.AppImage' | wc -l)" = 1
+          test -f staging/desktop/latest-linux.yml
+          test -f staging/apt/dists/stable/InRelease
+          test -f staging/flatpak/repo/summary
+          test -f staging/flatpak/repo/summary.sig
+          test -f staging/flatpak/vesper.flatpakrepo
+          test -f staging/flatpak/vesper.flatpakref
+          test -f "staging/flatpak/vesper-desktop_${VERSION}_x86_64.flatpak"
+          signature_count="$(
+            find staging/desktop -maxdepth 1 -type f -name '*.sig' | wc -l
+          )"
+          test "$signature_count" = 2
+
+      - name: Create release checksums
+        run: |
+          checksum_file="$PWD/staging/SHA256SUMS"
+          while IFS= read -r -d '' artifact; do
+            (
+              cd "$(dirname -- "$artifact")"
+              sha256sum "$(basename -- "$artifact")"
+            )
+          done < <(
+            find \
+              staging/desktop \
+              staging/flatpak \
+              -maxdepth 1 \
+              -type f \
+              ! -name '*.yml' \
+              ! -name '*.flatpakref' \
+              ! -name '*.flatpakrepo' \
+              -print0 |
+              sort -z
+          ) > "$checksum_file"
 
       - name: Create draft GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.update.outputs.version }}
-          UPDATE_PACKAGE: ${{ steps.update.outputs.package }}
-          FLATPAK_PACKAGE: ${{ steps.update.outputs.flatpak }}
+          VERSION: ${{ needs.verify.outputs.version }}
         run: |
           tag="v$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "A GitHub release already exists for $tag." >&2
+            exit 1
+          fi
+          mapfile -d '' -t release_assets < <(
+            find \
+              staging/desktop \
+              staging/flatpak \
+              -maxdepth 1 \
+              -type f \
+              ! -name '*.flatpakref' \
+              ! -name '*.flatpakrepo' \
+              -print0 |
+              sort -z
+          )
+          release_assets+=(staging/SHA256SUMS)
           gh release create "$tag" \
-            "$UPDATE_PACKAGE" \
-            "$UPDATE_PACKAGE.sig" \
-            "$FLATPAK_PACKAGE" \
+            "${release_assets[@]}" \
             --draft \
             --verify-tag \
             --title "Vesper $VERSION" \
             --notes "Vesper Desktop $VERSION for Linux x64."
 
-      - name: Remove updater signing material
-        if: always()
+      - name: Publish immutable Linux files
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.VESPER_DESKTOP_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCOUNT_ID }}
         run: |
-          key_file="$RUNNER_TEMP/vesper-desktop-update.key"
-          [[ ! -e "$key_file" ]] || shred -u "$key_file"
+          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          while IFS= read -r -d '' artifact; do
+            name="$(basename -- "$artifact")"
+            aws s3 cp \
+              "$artifact" \
+              "s3://$R2_BUCKET/desktop/$name" \
+              --endpoint-url "$endpoint" \
+              --cache-control 'public, max-age=31536000, immutable'
+          done < <(
+            find \
+              staging/desktop \
+              -maxdepth 1 \
+              -type f \
+              ! -name '*.yml' \
+              -print0
+          )
+          aws s3 cp \
+            staging/SHA256SUMS \
+            "s3://$R2_BUCKET/desktop/SHA256SUMS" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=300' \
+            --content-type 'text/plain'
+          aws s3 sync \
+            staging/apt/pool \
+            "s3://$R2_BUCKET/apt/pool" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=31536000, immutable'
+          aws s3 sync \
+            staging/flatpak/repo/objects \
+            "s3://$R2_BUCKET/flatpak/repo/objects" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=31536000, immutable'
+          if [[ -d staging/flatpak/repo/deltas ]]; then
+            aws s3 sync \
+              staging/flatpak/repo/deltas \
+              "s3://$R2_BUCKET/flatpak/repo/deltas" \
+              --endpoint-url "$endpoint" \
+              --cache-control 'public, max-age=31536000, immutable'
+          fi
+          while IFS= read -r -d '' flatpak_bundle; do
+            aws s3 cp \
+              "$flatpak_bundle" \
+              "s3://$R2_BUCKET/flatpak/$(basename -- "$flatpak_bundle")" \
+              --endpoint-url "$endpoint" \
+              --cache-control 'public, max-age=31536000, immutable'
+          done < <(
+            find \
+              staging/flatpak \
+              -maxdepth 1 \
+              -type f \
+              -name '*.flatpak' \
+              -print0
+          )
+
+      - name: Publish repository bootstrap files
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.VESPER_DESKTOP_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCOUNT_ID }}
+        run: |
+          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          aws s3 cp \
+            staging/apt/vesper-archive-keyring.gpg \
+            "s3://$R2_BUCKET/apt/vesper-archive-keyring.gpg" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=86400'
+          aws s3 cp \
+            staging/apt/vesper-archive-keyring.asc \
+            "s3://$R2_BUCKET/apt/vesper-archive-keyring.asc" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=86400' \
+            --content-type 'text/plain'
+          aws s3 cp \
+            staging/apt/vesper.sources \
+            "s3://$R2_BUCKET/apt/vesper.sources" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=3600' \
+            --content-type 'text/plain'
+          aws s3 cp \
+            staging/flatpak/vesper.flatpakrepo \
+            "s3://$R2_BUCKET/flatpak/vesper.flatpakrepo" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=3600' \
+            --content-type 'application/vnd.flatpak.repo'
+          aws s3 cp \
+            staging/flatpak/vesper.flatpakref \
+            "s3://$R2_BUCKET/flatpak/vesper.flatpakref" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=3600' \
+            --content-type 'application/vnd.flatpak.ref'
+
+      - name: Publish repository metadata
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.VESPER_DESKTOP_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCOUNT_ID }}
+        run: |
+          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          aws s3 sync \
+            staging/apt/dists \
+            "s3://$R2_BUCKET/apt/dists" \
+            --endpoint-url "$endpoint" \
+            --exclude 'stable/InRelease' \
+            --cache-control 'public, max-age=300'
+          aws s3 cp \
+            staging/apt/dists/stable/InRelease \
+            "s3://$R2_BUCKET/apt/dists/stable/InRelease" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=300' \
+            --content-type 'text/plain'
+          aws s3 sync \
+            staging/flatpak/repo \
+            "s3://$R2_BUCKET/flatpak/repo" \
+            --endpoint-url "$endpoint" \
+            --exclude 'objects/*' \
+            --exclude 'deltas/*' \
+            --exclude 'summary' \
+            --exclude 'summary.sig' \
+            --exclude 'summary.idx' \
+            --cache-control 'public, max-age=300'
+          for metadata in summary.sig summary.idx; do
+            if [[ -f "staging/flatpak/repo/$metadata" ]]; then
+              aws s3 cp \
+                "staging/flatpak/repo/$metadata" \
+                "s3://$R2_BUCKET/flatpak/repo/$metadata" \
+                --endpoint-url "$endpoint" \
+                --cache-control 'public, max-age=300'
+            fi
+          done
+          aws s3 cp \
+            staging/flatpak/repo/summary \
+            "s3://$R2_BUCKET/flatpak/repo/summary" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=300'
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: gh release edit "v$VERSION" --draft=false --latest
+
+      - name: Publish Linux updater manifest
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.VESPER_DESKTOP_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.VESPER_DESKTOP_R2_ACCOUNT_ID }}
+        run: |
+          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          aws s3 cp \
+            staging/desktop/latest-linux.yml \
+            "s3://$R2_BUCKET/desktop/latest-linux.yml" \
+            --endpoint-url "$endpoint" \
+            --cache-control 'public, max-age=300' \
+            --content-type 'text/yaml'

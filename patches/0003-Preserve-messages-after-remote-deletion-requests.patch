@@ -1,28 +1,30 @@
-From f3f46a64e5fcb03dcf31847d1092008bac9d0602 Mon Sep 17 00:00:00 2001
+From 4353c1a9c0486d449d07bbe5c79cfbdcb25eed25 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:54:15 +0100
-Subject: [PATCH 03/12] Preserve messages after remote deletion requests
+Subject: [PATCH 03/16] Preserve messages after remote deletion requests
 
 Add an opt-in privacy setting that keeps ordinary incoming chat messages when their sender deletes them for everyone. Administrator deletions, stories, and our own outgoing messages continue to use Signal's standard deletion path.
 
 Kept messages receive a local-only Deletion requested marker. The marker is deliberately outside Signal's backup schema.
+
+Signed-off-by: amber <amber@flourish.ch>
 ---
- .oxlint/rules/enforceLicenseComments.mjs      |  6 +-
- _locales/en/messages.json                     | 24 ++++++++
- stylesheets/_modules.scss                     |  9 +++
- ts/components/Preferences.dom.stories.tsx     |  2 +
- ts/components/Preferences.dom.tsx             | 42 +++++++++++++
- ts/components/conversation/Message.dom.tsx    | 16 ++++-
- .../TimelineMessage.dom.stories.tsx           | 12 ++++
- ts/model-types.d.ts                           |  1 +
- ts/state/selectors/message.preload.ts         |  1 +
- ts/state/smart/Preferences.preload.tsx        |  4 ++
- .../util/vesperDeleteForEveryone_test.std.ts  | 60 +++++++++++++++++++
- ts/types/Message.std.ts                       |  1 +
- ts/types/StorageKeys.std.ts                   |  2 +
- ts/util/deleteForEveryone.preload.ts          | 30 ++++++++--
- ts/util/vesperDeleteForEveryone.std.ts        | 16 +++++
- 15 files changed, 217 insertions(+), 9 deletions(-)
+ .oxlint/rules/enforceLicenseComments.mjs      |   6 +-
+ _locales/en/messages.json                     |  24 +++
+ stylesheets/_modules.scss                     |  28 ++++
+ ts/components/Preferences.dom.stories.tsx     |   2 +
+ ts/components/Preferences.dom.tsx             |  42 +++++
+ ts/components/conversation/Message.dom.tsx    | 147 ++++++++++++++----
+ .../TimelineMessage.dom.stories.tsx           |  23 +++
+ ts/model-types.d.ts                           |   1 +
+ ts/state/selectors/message.preload.ts         |   1 +
+ ts/state/smart/Preferences.preload.tsx        |   4 +
+ .../util/vesperDeleteForEveryone_test.std.ts  |  60 +++++++
+ ts/types/Message.std.ts                       |   1 +
+ ts/types/StorageKeys.std.ts                   |   2 +
+ ts/util/deleteForEveryone.preload.ts          |  30 +++-
+ ts/util/vesperDeleteForEveryone.std.ts        |  16 ++
+ 15 files changed, 349 insertions(+), 38 deletions(-)
  create mode 100644 ts/test-node/util/vesperDeleteForEveryone_test.std.ts
  create mode 100644 ts/util/vesperDeleteForEveryone.std.ts
 
@@ -46,7 +48,7 @@ index e61ad55f4..f7a33a7f6 100644
  
  export const enforceLicenseComments = ESLintUtils.RuleCreator.withoutDocs({
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index c3230a8cc..f2cba665d 100644
+index c3230a8cc..040675681 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
 @@ -8916,6 +8916,30 @@
@@ -58,19 +60,19 @@ index c3230a8cc..f2cba665d 100644
 +    "description": "Label of the keep deleted messages checkbox in Settings > Privacy > Vesper"
 +  },
 +  "icu:Vesper__Settings__KeepDeletedMessages__Description": {
-+    "messageformat": "Keep messages when someone deletes them for everyone. Vesper marks them as “Deletion requested”.",
++    "messageformat": "Keep messages when someone deletes them for everyone. Vesper labels them “Deletion requested”.",
 +    "description": "Description of the keep deleted messages checkbox in Settings > Privacy > Vesper"
 +  },
 +  "icu:Vesper__Settings__KeepDeletedMessages__EnableDialog__Title": {
-+    "messageformat": "Keep messages after deletion requests?",
++    "messageformat": "Keep deleted messages?",
 +    "description": "Title of the keep deleted messages enable confirmation"
 +  },
 +  "icu:Vesper__Settings__KeepDeletedMessages__EnableDialog__Description": {
-+    "messageformat": "Deleted messages can contain abuse or other content the sender meant to remove. Keeping them may affect other people’s privacy. Only turn this on if you understand that risk.",
++    "messageformat": "This can preserve evidence of abuse. Respect other people’s privacy, and don’t be a douchebag with it.",
 +    "description": "Description of the keep deleted messages enable confirmation"
 +  },
 +  "icu:Vesper__Settings__KeepDeletedMessages__EnableDialog__Action": {
-+    "messageformat": "Keep deleted messages",
++    "messageformat": "Keep messages",
 +    "description": "Action in the keep deleted messages enable confirmation"
 +  },
 +  "icu:Vesper__Message__DeletionRequested": {
@@ -81,24 +83,52 @@ index c3230a8cc..f2cba665d 100644
      "messageformat": "Update to version {version} available",
      "description": "Tooltip for new update available"
 diff --git a/stylesheets/_modules.scss b/stylesheets/_modules.scss
-index 6130993c2..a3ae2797e 100644
+index 6130993c2..a621fe672 100644
 --- a/stylesheets/_modules.scss
 +++ b/stylesheets/_modules.scss
-@@ -1156,6 +1156,15 @@ $message-padding-horizontal: 12px;
-   color: light-dark(variables.$color-gray-60, variables.$color-gray-25);
+@@ -1706,8 +1706,13 @@ $message-padding-horizontal: 12px;
+   z-index: variables.$z-index-above-base;
+   height: 22px;
+   display: flex;
++  align-items: center;
+   user-select: none;
+ 
++  &--with-deletion-requested {
++    height: 26px;
++  }
++
+   &--incoming {
+     align-self: flex-end;
+     padding-inline-end: 8px;
+@@ -1720,6 +1725,29 @@ $message-padding-horizontal: 12px;
+   }
  }
  
 +.module-message__deletion-requested {
-+  @include mixins.font-caption;
++  @include mixins.font-subtitle-bold;
 +
-+  display: block;
-+  margin-top: 4px;
++  align-items: center;
++  background: light-dark(#fdc7db, #a40449);
++  border-radius: 13px;
++  color: light-dark(#6d0028, #ffdad6);
++  display: flex;
++  flex: none;
++  gap: 4px;
++  height: 26px;
++  margin-inline: 1px;
++  padding-inline: 7px;
 +  user-select: none;
-+  color: var(--axo-color-label-destructive);
++  white-space: nowrap;
++
++  &--measure {
++    pointer-events: none;
++    position: absolute;
++    visibility: hidden;
++  }
 +}
 +
- .module-message__metadata {
-   @include mixins.font-caption;
+ .module-message__reactions__reaction {
+   @include mixins.button-reset;
  
 diff --git a/ts/components/Preferences.dom.stories.tsx b/ts/components/Preferences.dom.stories.tsx
 index 7fe5da66f..9038f7773 100644
@@ -216,10 +246,21 @@ index bd14797b7..51ec201db 100644
            <FlowingControl>
              <div className="Preferences__two-thirds-flow">
 diff --git a/ts/components/conversation/Message.dom.tsx b/ts/components/conversation/Message.dom.tsx
-index 4a080a725..e5965b116 100644
+index 4a080a725..948b7f47d 100644
 --- a/ts/components/conversation/Message.dom.tsx
 +++ b/ts/components/conversation/Message.dom.tsx
-@@ -307,6 +307,7 @@ export type PropsData = {
+@@ -83,6 +83,10 @@ import { clearTimeoutIfNecessary } from '../../util/clearTimeoutIfNecessary.std.
+ import { missingCaseError } from '../../util/missingCaseError.std.ts';
+ import type { HydratedBodyRangesType } from '../../types/BodyRange.std.ts';
+ import type { LocalizerType, ThemeType } from '../../types/Util.std.ts';
++import {
++  SizeObserver,
++  useSizeObserver,
++} from '../../hooks/useSizeObserver.dom.tsx';
+ 
+ import type { PreferredBadgeSelectorType } from '../../state/selectors/badges.preload.ts';
+ import type {
+@@ -307,6 +311,7 @@ export type PropsData = {
    reactions?: ReactionViewerProps['reactions'];
  
    deletedForEveryone?: boolean;
@@ -227,42 +268,224 @@ index 4a080a725..e5965b116 100644
    deletedForEveryoneByAdmin?: {
      conversationId: string;
      title: string;
-@@ -2455,13 +2456,17 @@ export class Message extends PureComponent<Props, State> {
-       showConversation,
-       showSpoiler,
-       status,
--
-       textAttachment,
-+      vesperDeletionRequested,
-     } = this.props;
-     const { metadataWidth } = this.state;
+@@ -428,6 +433,8 @@ type State = {
+ // Function component for reactions that can use hooks
+ type MessageReactionsProps = {
+   reactions: Array<Reaction>;
++  deletionRequested: boolean;
++  messageBubbleWidth: number;
+   getPreferredBadge: PreferredBadgeSelectorType;
+   i18n: LocalizerType;
+   theme: ThemeType;
+@@ -437,9 +444,53 @@ type MessageReactionsProps = {
+   popperPreventOverflowModifier: () => Partial<PreventOverflowModifier>;
+ };
  
-     const messageStatusContents = this.#getMessageStatusContents();
--    if (messageStatusContents == null && text == null) {
-+    if (
-+      messageStatusContents == null &&
-+      text == null &&
-+      !vesperDeletionRequested
-+    ) {
++type DeletionRequestedPillProps = {
++  label: string;
++  messageBubbleWidth: number;
++};
++
++function DeletionRequestedPill({
++  label,
++  messageBubbleWidth,
++}: DeletionRequestedPillProps): JSX.Element {
++  const measurementRef = useRef<HTMLSpanElement | null>(null);
++  const fullPillSize = useSizeObserver(measurementRef);
++  const compact =
++    messageBubbleWidth > 0 &&
++    fullPillSize != null &&
++    !fullPillSize.hidden &&
++    fullPillSize.width >= messageBubbleWidth - 5;
++
++  return (
++    <>
++      <span
++        aria-label={label}
++        className="module-message__deletion-requested"
++        dir="auto"
++      >
++        <AxoSymbol.Icon symbol="trash" size={20} label={null} />
++        {compact ? null : label}
++      </span>
++      <span
++        aria-hidden
++        className={classNames(
++          'module-message__deletion-requested',
++          'module-message__deletion-requested--measure'
++        )}
++        ref={measurementRef}
++      >
++        <AxoSymbol.Icon symbol="trash" size={20} label={null} />
++        {label}
++      </span>
++    </>
++  );
++}
++
+ const MessageReactions = forwardRef(function MessageReactions(
+   {
+     reactions,
++    deletionRequested,
++    messageBubbleWidth,
+     getPreferredBadge,
+     i18n,
+     theme,
+@@ -506,6 +557,9 @@ const MessageReactions = forwardRef(function MessageReactions(
+             ref={reactionsContainerRefMerger.current(parentRef, popperRef)}
+             className={classNames(
+               'module-message__reactions',
++              deletionRequested
++                ? 'module-message__reactions--with-deletion-requested'
++                : null,
+               outgoing
+                 ? 'module-message__reactions--outgoing'
+                 : 'module-message__reactions--incoming'
+@@ -514,6 +568,12 @@ const MessageReactions = forwardRef(function MessageReactions(
+               ev.stopPropagation();
+             }}
+           >
++            {deletionRequested && (
++              <DeletionRequestedPill
++                label={i18n('icu:Vesper__Message__DeletionRequested')}
++                messageBubbleWidth={messageBubbleWidth}
++              />
++            )}
+             {toRender.map((re, i) => {
+               const isLast = i === toRender.length - 1;
+               const isMore = isLast && someNotRendered;
+@@ -682,9 +742,9 @@ export class Message extends PureComponent<Props, State> {
+     return state;
+   }
+ 
+-  #hasReactions(): boolean {
+-    const { reactions } = this.props;
+-    return Boolean(reactions && reactions.length);
++  #hasReactionRail(): boolean {
++    const { reactions, vesperDeletionRequested } = this.props;
++    return Boolean(vesperDeletionRequested || reactions?.length);
+   }
+ 
+   public handleFocus = (): void => {
+@@ -2330,7 +2390,7 @@ export class Message extends PureComponent<Props, State> {
+       <div
+         className={classNames('module-message__author-avatar-container', {
+           'module-message__author-avatar-container--with-reactions':
+-            this.#hasReactions(),
++            this.#hasReactionRail(),
+         })}
+         inert={isSelectMode ? true : undefined}
+       >
+@@ -3048,10 +3108,19 @@ export class Message extends PureComponent<Props, State> {
+     });
+   };
+ 
+-  public renderReactions(outgoing: boolean): JSX.Element | null {
+-    const { getPreferredBadge, reactions = [], i18n, theme } = this.props;
++  public renderReactions(
++    outgoing: boolean,
++    messageBubbleWidth: number
++  ): JSX.Element | null {
++    const {
++      getPreferredBadge,
++      reactions = [],
++      i18n,
++      theme,
++      vesperDeletionRequested = false,
++    } = this.props;
+ 
+-    if (!this.#hasReactions()) {
++    if (!this.#hasReactionRail()) {
        return null;
      }
  
-@@ -2530,6 +2535,13 @@ export class Message extends PureComponent<Props, State> {
-             textAttachment={textAttachment}
-           />
-         )}
-+        {vesperDeletionRequested && (
-+          <span className="module-message__deletion-requested" dir="auto">
-+            <AxoSymbol.InlineGlyph symbol="trash" label={null} />
-+            &nbsp;
-+            {i18n('icu:Vesper__Message__DeletionRequested')}
-+          </span>
-+        )}
-         {this.#getMetadataPlacement() === MetadataPlacement.InlineWithText && (
-           <MessageTextMetadataSpacer metadataWidth={metadataWidth} />
-         )}
+@@ -3060,6 +3129,8 @@ export class Message extends PureComponent<Props, State> {
+     return (
+       <MessageReactions
+         reactions={reactions}
++        deletionRequested={vesperDeletionRequested}
++        messageBubbleWidth={messageBubbleWidth}
+         getPreferredBadge={getPreferredBadge}
+         i18n={i18n}
+         theme={theme}
+@@ -3384,7 +3455,9 @@ export class Message extends PureComponent<Props, State> {
+         ? `module-message__container--outgoing-${conversationColor}`
+         : null,
+       isClickable ? 'module-message__container--is-clickable' : null,
+-      this.#hasReactions() ? 'module-message__container--with-reactions' : null,
++      this.#hasReactionRail()
++        ? 'module-message__container--with-reactions'
++        : null,
+       deletedForEveryone
+         ? 'module-message__container--deleted-for-everyone'
+         : null,
+@@ -3416,29 +3489,41 @@ export class Message extends PureComponent<Props, State> {
+ 
+     return (
+       <div className="module-message__container-outer">
+-        {maybeWrapWithContextMenu(
+-          // the keyboard handler is a level higher in hierarchy due to selection
+-          //  oxlint-disable-next-line jsx-a11y/click-events-have-key-events
+-          <div
+-            className={containerClassnames}
+-            id={`message-accessibility-contents:${id}`}
+-            style={containerStyles}
+-            role="row"
+-            onClick={this.handleClick}
+-            onDoubleClick={ev => {
+-              // Prevent double click from triggering the replyToMessage action
+-              ev.stopPropagation();
+-            }}
+-            tabIndex={-1}
+-            inert={isSelectMode ? true : undefined}
+-          >
+-            {this.#renderAuthor()}
+-            <div dir={TextDirectionToDirAttribute[textDirection]}>
+-              {this.renderContents()}
+-            </div>
+-          </div>
+-        )}
+-        {this.renderReactions(direction === 'outgoing')}
++        <SizeObserver>
++          {(messageBubbleRef, messageBubbleSize) => (
++            <>
++              {maybeWrapWithContextMenu(
++                // the keyboard handler is a level higher in hierarchy due to selection
++                //  oxlint-disable-next-line jsx-a11y/click-events-have-key-events
++                <div
++                  className={containerClassnames}
++                  id={`message-accessibility-contents:${id}`}
++                  style={containerStyles}
++                  role="row"
++                  onClick={this.handleClick}
++                  onDoubleClick={ev => {
++                    // Prevent double click from triggering the replyToMessage action
++                    ev.stopPropagation();
++                  }}
++                  ref={messageBubbleRef}
++                  tabIndex={-1}
++                  inert={isSelectMode ? true : undefined}
++                >
++                  {this.#renderAuthor()}
++                  <div dir={TextDirectionToDirAttribute[textDirection]}>
++                    {this.renderContents()}
++                  </div>
++                </div>
++              )}
++              {this.renderReactions(
++                direction === 'outgoing',
++                messageBubbleSize != null && !messageBubbleSize.hidden
++                  ? messageBubbleSize.width
++                  : 0
++              )}
++            </>
++          )}
++        </SizeObserver>
+       </div>
+     );
+   }
 diff --git a/ts/components/conversation/TimelineMessage.dom.stories.tsx b/ts/components/conversation/TimelineMessage.dom.stories.tsx
-index 005a3f58e..71c478056 100644
+index 005a3f58e..bbcd1d67f 100644
 --- a/ts/components/conversation/TimelineMessage.dom.stories.tsx
 +++ b/ts/components/conversation/TimelineMessage.dom.stories.tsx
 @@ -261,6 +261,7 @@ const createProps = (overrideProps: Partial<Props> = {}): Props => ({
@@ -273,7 +496,7 @@ index 005a3f58e..71c478056 100644
    deletedForEveryoneByAdmin: overrideProps.deletedForEveryoneByAdmin,
    disableScroll: overrideProps.disableScroll,
    direction: overrideProps.direction || 'incoming',
-@@ -946,6 +947,17 @@ export function Deleted(): JSX.Element {
+@@ -946,6 +947,28 @@ export function Deleted(): JSX.Element {
    );
  }
  
@@ -282,6 +505,17 @@ index 005a3f58e..71c478056 100644
 +    conversationType: 'direct',
 +    direction: 'incoming',
 +    text: 'This message remains on this device.',
++    vesperDeletionRequested: true,
++  });
++
++  return <>{renderThree(props)}</>;
++}
++
++export function DeletionRequestedCompact(): JSX.Element {
++  const props = createProps({
++    conversationType: 'direct',
++    direction: 'incoming',
++    text: 'Meow',
 +    vesperDeletionRequested: true,
 +  });
 +

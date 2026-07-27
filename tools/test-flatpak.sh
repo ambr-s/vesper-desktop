@@ -7,6 +7,7 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$ROOT/work"
 APP_ID="systems.amber.Vesper"
+BUILD_DIR="$ROOT/artifacts/flatpak/build"
 
 if (($#)); then
   echo "Usage: $0" >&2
@@ -36,18 +37,14 @@ BUNDLE="$ROOT/artifacts/flatpak/vesper-desktop_${VERSION}_x86_64.flatpak"
   echo "Missing $BUNDLE; run ./tools/build-flatpak.sh first." >&2
   exit 1
 }
-
-if flatpak info --user "$APP_ID" >/dev/null 2>&1; then
-  if flatpak ps --columns=application | grep -Fx "$APP_ID" >/dev/null; then
-    flatpak kill "$APP_ID" 2>/dev/null || true
-  fi
-  flatpak uninstall --user --noninteractive "$APP_ID"
-fi
-flatpak install --user --noninteractive "$BUNDLE"
+[[ -f "$BUILD_DIR/metadata" && -x "$BUILD_DIR/files/Vesper/vesper-desktop" ]] || {
+  echo "Missing completed Flatpak build directory; rerun ./tools/build-flatpak.sh." >&2
+  exit 1
+}
 
 # Expand these paths and variables inside the Flatpak sandbox.
 # shellcheck disable=SC2016
-flatpak run --command=sh "$APP_ID" -c '
+flatpak build --readonly "$BUILD_DIR" sh -c '
   set -eu
   test "$(cat /app/Vesper/resources/package-type)" = flatpak
   test "$VESPER_PASSWORD_STORE" = gnome-libsecret
@@ -63,20 +60,23 @@ flatpak run --command=sh "$APP_ID" -c '
   grep -q "x-scheme-handler/vespercaptcha" "$desktop"
 '
 
-INSTALLATION="$(flatpak info --user --show-location "$APP_ID")"
-strings "$INSTALLATION/files/Vesper/vesper-desktop" |
+strings "$BUILD_DIR/files/Vesper/vesper-desktop" |
   grep -F "Electron/$ELECTRON_VERSION" >/dev/null
 
-if flatpak run \
+if flatpak build \
+  --readonly \
+  --socket=session-bus \
   --env=VESPER_PASSWORD_STORE=basic \
-  "$APP_ID" \
+  "$BUILD_DIR" \
+  /app/bin/vesper-desktop \
   --version >/dev/null 2>&1; then
   echo "Flatpak unexpectedly accepted the plaintext password store." >&2
   exit 1
 fi
 
-SMOKE_ROOT_PARENT="$HOME/.var/app/$APP_ID/cache"
-mkdir -p -- "$SMOKE_ROOT_PARENT"
+SMOKE_ROOT_PARENT="$(
+  mktemp -d "${TMPDIR:-/tmp}/vesper-flatpak-smoke-parent.XXXXXXXX"
+)"
 SMOKE_ROOT="$(mktemp -d "$SMOKE_ROOT_PARENT/vesper-flatpak-smoke.XXXXXXXX")"
 SMOKE_LOG_FIRST="$(mktemp "${TMPDIR:-/tmp}/vesper-flatpak-smoke-first.XXXXXXXX")"
 SMOKE_LOG_SECOND="$(mktemp "${TMPDIR:-/tmp}/vesper-flatpak-smoke-second.XXXXXXXX")"
@@ -89,10 +89,7 @@ cleanup() {
     -maxdepth 0 \
     -type f \
     -delete
-  if flatpak ps --columns=application | grep -Fx "$APP_ID" >/dev/null; then
-    flatpak kill "$APP_ID" 2>/dev/null || true
-  fi
-  find "$SMOKE_ROOT" -depth -delete
+  find "$SMOKE_ROOT_PARENT" -depth -delete
 }
 trap cleanup EXIT
 
@@ -102,12 +99,12 @@ run_smoke() {
 
   set +e
   timeout --signal=TERM --kill-after=5s 20s \
-    xvfb-run --auto-servernum \
-      flatpak run \
-        --env=VESPER_DISABLE_GPU=1 \
-        "$APP_ID" \
-        "--user-data-dir=$SMOKE_ROOT/Vesper" \
-        --start-in-tray >"$log_file" 2>&1
+    xvfb-run \
+      --auto-servernum \
+      --server-args='-screen 0 1280x720x24 -nolisten tcp -ac' \
+      bash "$ROOT/tools/run-flatpak-smoke-under-xvfb.sh" \
+        "$BUILD_DIR" \
+        "$SMOKE_ROOT" >"$log_file" 2>&1
   smoke_status=$?
   set -e
 
@@ -119,9 +116,6 @@ run_smoke() {
   fi
 
   grep -Fq "userData: $SMOKE_ROOT/Vesper" "$log_file"
-  if flatpak ps --columns=application | grep -Fx "$APP_ID" >/dev/null; then
-    flatpak kill "$APP_ID" 2>/dev/null || true
-  fi
 }
 
 run_smoke "$SMOKE_LOG_FIRST"
@@ -153,6 +147,6 @@ if [[ -s "$PROBLEM_LOG" ]]; then
   exit 1
 fi
 
-echo "Verified installed $APP_ID with Electron $ELECTRON_VERSION."
+echo "Verified $APP_ID bundle contents with Electron $ELECTRON_VERSION."
 echo "Verified encrypted gnome-libsecret storage with no plaintext SQL key."
 echo "The Flatpak remained live across two 20-second smoke tests."

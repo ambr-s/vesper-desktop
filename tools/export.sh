@@ -65,6 +65,21 @@ if ((${#FEATURE_COMMITS[@]} == 0)); then
   exit 0
 fi
 
+for commit in "${FEATURE_COMMITS[@]}"; do
+  author="$(git -C "$WORK" show -s --format='%an <%ae>' "$commit")"
+  signoffs="$(
+    git -C "$WORK" show -s \
+      --format='%(trailers:key=Signed-off-by,valueonly)' \
+      "$commit"
+  )"
+  if ! grep -Fqx -- "$author" <<< "$signoffs"; then
+    subject="$(git -C "$WORK" show -s --format=%s "$commit")"
+    echo "Feature commit lacks its author's DCO sign-off: $subject" >&2
+    echo "Amend it with: git commit --amend -s" >&2
+    exit 1
+  fi
+done
+
 git -C "$WORK" format-patch \
   --no-signature \
   --output-directory "$ROOT/patches" \

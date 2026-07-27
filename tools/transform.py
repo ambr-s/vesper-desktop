@@ -122,7 +122,6 @@ def transform_package(checkout: Path, brand: dict[str, str]) -> None:
     win_signing = build["win"]["signtoolOptions"]
     for key in ("certificateSubjectName", "certificateSha1", "publisherName"):
         win_signing.pop(key, None)
-
     linux = build["linux"]
     expect(linux["executableName"], "signal-desktop", "build.linux.executableName")
     expect(
@@ -132,6 +131,12 @@ def transform_package(checkout: Path, brand: dict[str, str]) -> None:
     )
     linux["executableName"] = brand["EXECUTABLE_NAME"]
     linux["desktop"]["entry"]["StartupWMClass"] = "vesper"
+    expect(
+        linux["target"],
+        [{"target": "deb", "arch": "x64"}],
+        "build.linux.target",
+    )
+    linux["target"].append({"target": "AppImage", "arch": "x64"})
     linux["extraResources"][0]["filter"] = ["systems.amber.vesper.*.policy"]
 
     expect(
@@ -144,6 +149,7 @@ def transform_package(checkout: Path, brand: dict[str, str]) -> None:
         "schemes": [
             brand["PROTOCOL_SCHEME"],
             brand["CAPTCHA_PROTOCOL_SCHEME"],
+            "sgnl",
         ],
     }
 
@@ -159,10 +165,10 @@ def transform_configuration(checkout: Path, brand: dict[str, str]) -> None:
     default["updatesPublicKey"] = brand["UPDATES_PUBLIC_KEY"]
     default["appImageUpdatesPublicKey"] = brand["APPIMAGE_UPDATES_PUBLIC_KEY"]
     default["challengeUrl"] = (
-        f'{brand["UPDATE_ORIGIN"]}/captcha/challenge/generate.html'
+        f'{brand["SERVICE_ORIGIN"]}/captcha/challenge/generate.html'
     )
     default["registrationChallengeUrl"] = (
-        f'{brand["UPDATE_ORIGIN"]}/captcha/registration/generate.html'
+        f'{brand["SERVICE_ORIGIN"]}/captcha/registration/generate.html'
     )
     write_json(default_path, default)
 

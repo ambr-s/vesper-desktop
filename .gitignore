@@ -7,6 +7,7 @@
 /artifacts/
 /build/
 /.cache/
+/.wrangler/
 __pycache__/
 *.pyc
 *.deb

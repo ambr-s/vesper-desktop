@@ -31,19 +31,19 @@ jobs:
         run: ./tools/materialize.sh
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           package_json_file: work/package.json
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: work/.nvmrc
           cache: pnpm
           cache-dependency-path: work/pnpm-lock.yaml
 
       - name: Cache Electron native builds
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.electron-gyp
           key: electron-gyp-${{ runner.os }}-${{ hashFiles('work/pnpm-lock.yaml') }}
@@ -70,6 +70,9 @@ jobs:
           name: vesper-desktop-linux-x64
           path: |
             work/release/vesper-desktop_*_amd64.deb
+            work/release/vesper-desktop_*_x86_64.AppImage
+            work/release/vesper-desktop_*_x86_64.AppImage.blockmap
+            work/release/latest-linux.yml
             artifacts/flatpak/vesper-desktop_*_x86_64.flatpak
           if-no-files-found: error
           retention-days: 14

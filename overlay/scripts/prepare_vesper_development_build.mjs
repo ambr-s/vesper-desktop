@@ -36,12 +36,14 @@ for (const [path, expected, replacement] of Values) {
 const schemes = packageJson.build.protocols.schemes;
 if (
   !Array.isArray(schemes) ||
-  schemes.length !== 2 ||
+  schemes.length !== 3 ||
   schemes[0] !== "vesper" ||
-  schemes[1] !== "vespercaptcha"
+  schemes[1] !== "vespercaptcha" ||
+  schemes[2] !== "sgnl"
 ) {
   throw new Error("Unexpected production protocol schemes");
 }
+// Only installed production builds claim Signal's global fallback scheme.
 packageJson.build.protocols.schemes = [
   "vesper-development",
   "vespercaptcha-development",

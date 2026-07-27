@@ -1,0 +1,2014 @@
+From 736cdc49b24573b2470ab9dabc5bf1fa2fd32278 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Mon, 27 Jul 2026 16:29:51 +0100
+Subject: [PATCH 15/16] feat: load shared Vesper account configuration
+
+Cache and refresh the per-account Vesper config outside startup, apply account-specific flag overrides, and derive developer identity only from the hashed remote list. Show that verified identity throughout contact surfaces and on the contact information card. Also finish deletion-pill layout and Vesper-owned source attribution fixes.
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ _locales/en/messages.json                     |   4 +
+ stylesheets/_modules.scss                     |   5 +
+ stylesheets/components/AboutContactModal.scss |   7 +
+ stylesheets/components/BrandTheme.scss        |   2 +-
+ stylesheets/components/VesperTitleBar.scss    |   2 +-
+ ts/RemoteConfig.dom.ts                        |  17 ++
+ ts/VesperConfig.dom.ts                        | 247 ++++++++++++++++++
+ ts/background.preload.ts                      |  19 ++
+ .../CallNeedPermissionScreen.dom.tsx          |   5 +-
+ .../CallingParticipantListItem.dom.tsx        |   1 +
+ .../CallingPendingParticipants.dom.tsx        |   6 +-
+ ts/components/CallingRaisedHandsList.dom.tsx  |   1 +
+ ts/components/ContactPill.dom.tsx             |   3 +
+ .../GroupCallRemoteParticipant.dom.tsx        |  15 +-
+ ts/components/GroupDialog.dom.tsx             |   1 +
+ ts/components/IncomingCallBar.dom.tsx         |   4 +-
+ ...yCreatedGroupInvitedContactsDialog.dom.tsx |   9 +-
+ ts/components/StoryDetailsModal.dom.tsx       |  10 +-
+ ts/components/StoryViewsNRepliesModal.dom.tsx |   6 +-
+ ts/components/VesperTitleBar.dom.tsx          |   2 +-
+ .../conversation/AboutContactModal.dom.tsx    |  11 +
+ .../ContactSpoofingReviewDialogPerson.dom.tsx |   1 +
+ .../conversation/GroupNotification.dom.tsx    |   6 +-
+ .../conversation/GroupV1Migration.dom.tsx     |   7 +-
+ ts/components/conversation/Message.dom.tsx    | 239 +++++++++--------
+ .../conversation/MessageDetail.dom.tsx        |   3 +-
+ ts/components/conversation/Quote.dom.tsx      |   5 +-
+ .../conversation/ReactionViewer.dom.tsx       |   2 +
+ ...emoveGroupMemberConfirmationDialog.dom.tsx |   7 +-
+ .../SafetyNumberNotification.dom.tsx          |   5 +-
+ .../conversation/TimerNotification.dom.tsx    |   8 +-
+ .../conversation/UnsupportedMessage.dom.tsx   |   5 +-
+ .../VerificationNotification.dom.tsx          |   9 +-
+ .../ConfirmAdditionsModal.dom.tsx             |   7 +-
+ .../poll-message/PollVotesModal.dom.tsx       |   3 +-
+ .../conversationList/ContactCheckbox.dom.tsx  |  10 +-
+ .../conversationList/ContactListItem.dom.tsx  |  21 +-
+ .../ConversationListItem.dom.tsx              |   3 +-
+ .../MessageSearchResult.dom.tsx               |   6 +-
+ ts/state/selectors/message.preload.ts         |  13 +-
+ ts/test-node/VesperConfig_test.dom.ts         | 127 +++++++++
+ ts/test-node/util/isVesperAuthor_test.std.ts  |  42 ++-
+ .../util/vesperDeleteForEveryone_test.std.ts  |  39 ++-
+ ts/test-node/util/vesperProtocol_test.std.ts  |   2 +-
+ ts/types/StorageKeys.std.ts                   |   7 +
+ ts/types/Stories.std.ts                       |   1 +
+ ts/util/isVesperAuthor.std.ts                 |   7 +-
+ ts/util/vesperDeleteForEveryone.std.ts        |  17 +-
+ ts/util/vesperProtocol.std.ts                 |   2 +-
+ 49 files changed, 828 insertions(+), 153 deletions(-)
+ create mode 100644 ts/VesperConfig.dom.ts
+ create mode 100644 ts/test-node/VesperConfig_test.dom.ts
+
+diff --git a/_locales/en/messages.json b/_locales/en/messages.json
+index ee70fc3a1..24b5f595b 100644
+--- a/_locales/en/messages.json
++++ b/_locales/en/messages.json
+@@ -8988,6 +8988,10 @@
+     "messageformat": "Deletion requested",
+     "description": "Local-only label shown on a message that Vesper kept after a remote deletion request"
+   },
++  "icu:Vesper__AboutContactModal__Developer": {
++    "messageformat": "Vesper Developer",
++    "description": "Identity shown on the contact information card for a developer listed by Vesper's config service"
++  },
+   "icu:DialogUpdate--version-available": {
+     "messageformat": "Update to version {version} available",
+     "description": "Tooltip for new update available"
+diff --git a/stylesheets/_modules.scss b/stylesheets/_modules.scss
+index 3a8539ad4..af5e63672 100644
+--- a/stylesheets/_modules.scss
++++ b/stylesheets/_modules.scss
+@@ -1748,6 +1748,11 @@ $message-padding-horizontal: 12px;
+   }
+ }
+ 
++.module-message__reactions__items {
++  align-items: center;
++  display: flex;
++}
++
+ .module-message__reactions__reaction {
+   @include mixins.button-reset;
+ 
+diff --git a/stylesheets/components/AboutContactModal.scss b/stylesheets/components/AboutContactModal.scss
+index 7022771ce..e3e064f90 100644
+--- a/stylesheets/components/AboutContactModal.scss
++++ b/stylesheets/components/AboutContactModal.scss
+@@ -54,6 +54,13 @@
+       @include about-modal-icon('../images/icons/v3/person/person-compact.svg');
+     }
+ 
++    &--vesper-developer {
++      align-items: center;
++      display: inline-flex;
++      font-size: 20px;
++      justify-content: center;
++    }
++
+     &--verified {
+       @include about-modal-icon(
+         '../images/icons/v3/safety_number/safety_number.svg'
+diff --git a/stylesheets/components/BrandTheme.scss b/stylesheets/components/BrandTheme.scss
+index e03009bca..d7f0b57e1 100644
+--- a/stylesheets/components/BrandTheme.scss
++++ b/stylesheets/components/BrandTheme.scss
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Signal Messenger, LLC
++// Copyright 2026 Vesper contributors
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ @use 'sass:color';
+diff --git a/stylesheets/components/VesperTitleBar.scss b/stylesheets/components/VesperTitleBar.scss
+index c0c7175f0..a230d3e8b 100644
+--- a/stylesheets/components/VesperTitleBar.scss
++++ b/stylesheets/components/VesperTitleBar.scss
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Signal Messenger, LLC
++// Copyright 2026 Vesper contributors
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ .VesperTitleBar {
+diff --git a/ts/RemoteConfig.dom.ts b/ts/RemoteConfig.dom.ts
+index 1710ab1bf..3fb9a6f73 100644
+--- a/ts/RemoteConfig.dom.ts
++++ b/ts/RemoteConfig.dom.ts
+@@ -23,6 +23,7 @@ import type {
+   AssertSameMembers,
+   StripPrefix,
+ } from './types/Util.std.ts';
++import { getVesperConfigFlagOverride } from './VesperConfig.dom.ts';
+ 
+ const { get, throttle } = lodash;
+ 
+@@ -366,6 +367,12 @@ export function isEnabled(
+     reduxConfig != null || config != null,
+     'getValue called before remote config is ready'
+   );
++  const override = getVesperConfigFlagOverride(name);
++  if (override.isPresent) {
++    return (
++      override.value != null && String(override.value).toLowerCase() !== 'false'
++    );
++  }
+   return get(reduxConfig ?? config, [name, 'enabled'], false);
+ }
+ 
+@@ -377,6 +384,16 @@ export function getValue(
+     reduxConfig != null || config != null,
+     'getValue called before remote config is ready'
+   );
++  const override = getVesperConfigFlagOverride(name);
++  if (override.isPresent) {
++    if (
++      override.value == null ||
++      String(override.value).toLowerCase() === 'false'
++    ) {
++      return undefined;
++    }
++    return String(override.value);
++  }
+   return get(reduxConfig ?? config, [name, 'value']);
+ }
+ 
+diff --git a/ts/VesperConfig.dom.ts b/ts/VesperConfig.dom.ts
+new file mode 100644
+index 000000000..4ac3c91db
+--- /dev/null
++++ b/ts/VesperConfig.dom.ts
+@@ -0,0 +1,247 @@
++// Copyright 2026 Vesper contributors
++// SPDX-License-Identifier: AGPL-3.0-only
++
++import * as Bytes from './Bytes.std.ts';
++import { createLogger } from './logging/log.std.ts';
++import { HashType } from './types/Crypto.std.ts';
++import type { AciString, ServiceIdString } from './types/ServiceId.std.ts';
++import type { StorageInterface } from './types/Storage.d.ts';
++import { DAY } from './util/durations/index.std.ts';
++import { isAciString } from './util/isAciString.std.ts';
++
++const log = createLogger('VesperConfig');
++
++const CONFIG_ORIGIN = 'https://vsp.asy.st';
++const ACI_HASH_PATTERN = /^[0-9a-f]{64}$/u;
++const FLAG_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9._-]{0,127}$/u;
++const REFRESH_INTERVAL = DAY;
++
++export type VesperConfigValue = boolean | number | string | null;
++
++export type VesperConfigFlagOverride = Readonly<{
++  name: string;
++  value: VesperConfigValue;
++}>;
++
++export type VesperConfigResponse = Readonly<{
++  schemaVersion: 1;
++  developerAciHashes: ReadonlyArray<string>;
++  flagOverrides: ReadonlyArray<VesperConfigFlagOverride>;
++}>;
++
++type VesperConfigStorage = Pick<StorageInterface, 'get' | 'put'>;
++type FetchType = typeof fetch;
++
++export type RefreshOptions = Readonly<{
++  aci: AciString | undefined;
++  fetchFn?: FetchType;
++  isInternalUser: boolean;
++  now?: number;
++  storage: VesperConfigStorage;
++}>;
++
++export type FlagOverrideResult =
++  | Readonly<{ isPresent: false }>
++  | Readonly<{ isPresent: true; value: VesperConfigValue }>;
++
++const EMPTY_CONFIG: VesperConfigResponse = {
++  schemaVersion: 1,
++  developerAciHashes: [],
++  flagOverrides: [],
++};
++
++let developerAciHashes: ReadonlySet<string> = new Set();
++let flagOverrides: ReadonlyMap<string, VesperConfigValue> = new Map();
++
++const aciHashCache = new Map<AciString, string>();
++
++function isConfigValue(value: unknown): value is VesperConfigValue {
++  return (
++    value == null ||
++    typeof value === 'boolean' ||
++    typeof value === 'string' ||
++    (typeof value === 'number' && Number.isFinite(value))
++  );
++}
++
++export function parseVesperConfig(value: unknown): VesperConfigResponse {
++  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
++    throw new Error('Vesper config must be an object');
++  }
++
++  const candidate = value as Record<string, unknown>;
++  if (candidate.schemaVersion !== 1) {
++    throw new Error('Unsupported Vesper config schema');
++  }
++
++  const hashes = candidate.developerAciHashes;
++  if (
++    !Array.isArray(hashes) ||
++    hashes.some(
++      hash => typeof hash !== 'string' || !ACI_HASH_PATTERN.test(hash)
++    )
++  ) {
++    throw new Error('Invalid Vesper developer ACI hashes');
++  }
++
++  const overrides = candidate.flagOverrides;
++  if (
++    !Array.isArray(overrides) ||
++    overrides.some(item => {
++      if (item == null || typeof item !== 'object' || Array.isArray(item)) {
++        return true;
++      }
++      const { name, value: overrideValue } = item as Record<string, unknown>;
++      return (
++        typeof name !== 'string' ||
++        !FLAG_NAME_PATTERN.test(name) ||
++        !isConfigValue(overrideValue)
++      );
++    })
++  ) {
++    throw new Error('Invalid Vesper config flag overrides');
++  }
++
++  return {
++    schemaVersion: 1,
++    developerAciHashes: [...new Set(hashes as Array<string>)].sort(),
++    flagOverrides: (overrides as Array<VesperConfigFlagOverride>)
++      .map(({ name, value: overrideValue }) => ({
++        name,
++        value: overrideValue,
++      }))
++      .sort((left, right) => left.name.localeCompare(right.name)),
++  };
++}
++
++function activate(nextConfig: VesperConfigResponse): void {
++  developerAciHashes = new Set(nextConfig.developerAciHashes);
++  flagOverrides = new Map(
++    nextConfig.flagOverrides.map(({ name, value }) => [name, value])
++  );
++}
++
++export function restoreVesperConfigFromStorage({
++  storage,
++}: Readonly<{ storage: VesperConfigStorage }>): void {
++  const stored = storage.get('vesperConfig');
++  if (stored == null) {
++    activate(EMPTY_CONFIG);
++    return;
++  }
++
++  try {
++    activate(parseVesperConfig(stored));
++  } catch (error) {
++    log.warn('Ignoring invalid cached Vesper config', error);
++    activate(EMPTY_CONFIG);
++  }
++}
++
++export function hashVesperAci(aci: AciString): string {
++  const cached = aciHashCache.get(aci);
++  if (cached != null) {
++    return cached;
++  }
++
++  const hash = Bytes.toHex(
++    window.SignalContext.crypto.hash(
++      HashType.size256,
++      Bytes.fromString(aci.toLowerCase())
++    )
++  );
++  aciHashCache.set(aci, hash);
++  return hash;
++}
++
++export function isVesperDeveloper({
++  serviceId,
++}: Readonly<{ serviceId?: ServiceIdString | null }>): boolean {
++  return (
++    isAciString(serviceId) && developerAciHashes.has(hashVesperAci(serviceId))
++  );
++}
++
++export function getVesperDeveloperAciHashes(): ReadonlySet<string> {
++  return developerAciHashes;
++}
++
++export function getVesperConfigFlagOverride(name: string): FlagOverrideResult {
++  if (!flagOverrides.has(name)) {
++    return { isPresent: false };
++  }
++  return { isPresent: true, value: flagOverrides.get(name) ?? null };
++}
++
++export function shouldRefreshVesperConfig({
++  isInternalUser,
++  lastFetchTime,
++  now,
++}: Readonly<{
++  isInternalUser: boolean;
++  lastFetchTime: number | undefined;
++  now: number;
++}>): boolean {
++  if (isInternalUser) {
++    return true;
++  }
++  if (lastFetchTime == null || lastFetchTime <= 0) {
++    return true;
++  }
++
++  const elapsed = now - lastFetchTime;
++  return elapsed < 0 || elapsed >= REFRESH_INTERVAL;
++}
++
++export async function maybeRefreshVesperConfig({
++  aci,
++  fetchFn = fetch,
++  isInternalUser,
++  now = Date.now(),
++  storage,
++}: RefreshOptions): Promise<'skipped' | 'not-modified' | 'updated'> {
++  if (aci == null) {
++    return 'skipped';
++  }
++
++  if (
++    !shouldRefreshVesperConfig({
++      isInternalUser,
++      lastFetchTime: storage.get('vesperConfigLastFetchTime'),
++      now,
++    })
++  ) {
++    return 'skipped';
++  }
++
++  const etag = storage.get('vesperConfigEtag');
++  const response = await fetchFn(
++    `${CONFIG_ORIGIN}/config/${hashVesperAci(aci)}`,
++    {
++      cache: 'no-store',
++      headers: etag ? { 'If-None-Match': etag } : undefined,
++    }
++  );
++
++  if (response.status === 304) {
++    await storage.put('vesperConfigLastFetchTime', now);
++    return 'not-modified';
++  }
++
++  if (!response.ok) {
++    throw new Error(`Vesper config request failed with ${response.status}`);
++  }
++
++  const nextConfig = parseVesperConfig(await response.json());
++  const nextEtag = response.headers.get('etag');
++  if (!nextEtag) {
++    throw new Error('Vesper config response is missing an ETag');
++  }
++
++  await storage.put('vesperConfig', nextConfig);
++  await storage.put('vesperConfigEtag', nextEtag);
++  await storage.put('vesperConfigLastFetchTime', now);
++  activate(nextConfig);
++
++  return 'updated';
++}
+diff --git a/ts/background.preload.ts b/ts/background.preload.ts
+index 1aa1f8e1a..08cba85c0 100644
+--- a/ts/background.preload.ts
++++ b/ts/background.preload.ts
+@@ -259,6 +259,10 @@ import {
+   maybeRefreshRemoteConfig,
+   forceRefreshRemoteConfig,
+ } from './RemoteConfig.dom.ts';
++import {
++  maybeRefreshVesperConfig,
++  restoreVesperConfigFromStorage,
++} from './VesperConfig.dom.ts';
+ import {
+   getParametersForRedux,
+   loadAll,
+@@ -558,9 +562,24 @@ async function startApp(): Promise<void> {
+     }
+     first = false;
+ 
++    restoreVesperConfigFromStorage({
++      storage: itemStorage,
++    });
+     restoreRemoteConfigFromStorage({
+       storage: itemStorage,
+     });
++    drop(
++      maybeRefreshVesperConfig({
++        aci: itemStorage.user.getAci(),
++        isInternalUser: isRemoteConfigValueEnabled('desktop.internalUser'),
++        storage: itemStorage,
++      }).catch(error => {
++        log.warn(
++          'Unable to refresh cached Vesper config',
++          Errors.toLogFormat(error)
++        );
++      })
++    );
+ 
+     MessageCache.install();
+     initMessageCleanup();
+diff --git a/ts/components/CallNeedPermissionScreen.dom.tsx b/ts/components/CallNeedPermissionScreen.dom.tsx
+index 6db0e362e..ea118b471 100644
+--- a/ts/components/CallNeedPermissionScreen.dom.tsx
++++ b/ts/components/CallNeedPermissionScreen.dom.tsx
+@@ -21,6 +21,7 @@ export type Props = {
+     | 'name'
+     | 'phoneNumber'
+     | 'profileName'
++    | 'serviceId'
+     | 'title'
+   >;
+   i18n: LocalizerType;
+@@ -64,7 +65,9 @@ export function CallNeedPermissionScreen({
+           i18n={i18n}
+           id="icu:callNeedPermission"
+           components={{
+-            title: <ContactName title={title} />,
++            title: (
++              <ContactName serviceId={conversation.serviceId} title={title} />
++            ),
+           }}
+         />
+       </p>
+diff --git a/ts/components/CallingParticipantListItem.dom.tsx b/ts/components/CallingParticipantListItem.dom.tsx
+index 93a68db83..e07cb0a2a 100644
+--- a/ts/components/CallingParticipantListItem.dom.tsx
++++ b/ts/components/CallingParticipantListItem.dom.tsx
+@@ -134,6 +134,7 @@ export function CallingParticipantListItem({
+             <div className={tw('min-w-0 truncate')}>
+               <ContactName
+                 module="module-calling-participants-list__name"
++                serviceId={participant.serviceId}
+                 title={participant.title}
+               />
+               {isInSystemContacts(participant) ? (
+diff --git a/ts/components/CallingPendingParticipants.dom.tsx b/ts/components/CallingPendingParticipants.dom.tsx
+index 552e5de32..7398c3f45 100644
+--- a/ts/components/CallingPendingParticipants.dom.tsx
++++ b/ts/components/CallingPendingParticipants.dom.tsx
+@@ -275,6 +275,7 @@ export function CallingPendingParticipants({
+                 />
+                 <ContactName
+                   module="module-calling-participants-list__name"
++                  serviceId={participant.serviceId}
+                   title={participant.title}
+                 />
+                 {isInSystemContacts(participant) ? (
+@@ -370,7 +371,10 @@ export function CallingPendingParticipants({
+               />
+               <div className="CallingPendingParticipants__CompactParticipantNameColumn">
+                 <div className="CallingPendingParticipants__ParticipantName">
+-                  <ContactName title={participant.title} />
++                  <ContactName
++                    serviceId={participant.serviceId}
++                    title={participant.title}
++                  />
+                   {isInSystemContacts(participant) ? (
+                     <InContactsIcon
+                       className="module-calling-participants-list__contact-icon"
+diff --git a/ts/components/CallingRaisedHandsList.dom.tsx b/ts/components/CallingRaisedHandsList.dom.tsx
+index 4493e4afe..a8b644a3c 100644
+--- a/ts/components/CallingRaisedHandsList.dom.tsx
++++ b/ts/components/CallingRaisedHandsList.dom.tsx
+@@ -124,6 +124,7 @@ export function CallingRaisedHandsList({
+                   ) : (
+                     <ContactName
+                       module="module-calling-participants-list__name"
++                      serviceId={conversation.serviceId}
+                       title={conversation.title}
+                     />
+                   )}
+diff --git a/ts/components/ContactPill.dom.tsx b/ts/components/ContactPill.dom.tsx
+index 2828b2faa..77115d407 100644
+--- a/ts/components/ContactPill.dom.tsx
++++ b/ts/components/ContactPill.dom.tsx
+@@ -23,6 +23,7 @@ export type PropsType = {
+   | 'isMe'
+   | 'phoneNumber'
+   | 'profileName'
++  | 'serviceId'
+   | 'title'
+ >;
+ 
+@@ -36,6 +37,7 @@ export function ContactPill({
+   id,
+   phoneNumber,
+   profileName,
++  serviceId,
+   title,
+   onClickRemove,
+ }: PropsType): JSX.Element {
+@@ -61,6 +63,7 @@ export function ContactPill({
+         firstName={firstName}
+         module="module-ContactPill__contact-name"
+         preferFirstName
++        serviceId={serviceId}
+         title={title}
+       />
+       <button
+diff --git a/ts/components/GroupCallRemoteParticipant.dom.tsx b/ts/components/GroupCallRemoteParticipant.dom.tsx
+index 8be3e14fc..dba57a6bc 100644
+--- a/ts/components/GroupCallRemoteParticipant.dom.tsx
++++ b/ts/components/GroupCallRemoteParticipant.dom.tsx
+@@ -118,6 +118,7 @@ export const GroupCallRemoteParticipant: FC<PropsType> = memo(
+       mediaKeysReceived,
+       profileName,
+       raisedHandOrder,
++      serviceId,
+       sharingScreen,
+       title,
+       titleNoDefault,
+@@ -387,6 +388,7 @@ export const GroupCallRemoteParticipant: FC<PropsType> = memo(
+       const nameElement = (
+         <ContactName
+           module="module-ongoing-call__group-call-remote-participant__info__contact-name"
++          serviceId={serviceId}
+           title={title}
+         />
+       );
+@@ -518,7 +520,9 @@ export const GroupCallRemoteParticipant: FC<PropsType> = memo(
+               i18n={i18n}
+               id="icu:calling__block-info-title"
+               components={{
+-                name: <ContactName key="name" title={title} />,
++                name: (
++                  <ContactName key="name" serviceId={serviceId} title={title} />
++                ),
+               }}
+             />
+           </div>
+@@ -532,7 +536,13 @@ export const GroupCallRemoteParticipant: FC<PropsType> = memo(
+                 i18n={i18n}
+                 id="icu:calling__missing-media-keys"
+                 components={{
+-                  name: <ContactName key="name" title={titleNoDefault} />,
++                  name: (
++                    <ContactName
++                      key="name"
++                      serviceId={serviceId}
++                      title={titleNoDefault}
++                    />
++                  ),
+                 }}
+               />
+             ) : (
+@@ -549,6 +559,7 @@ export const GroupCallRemoteParticipant: FC<PropsType> = memo(
+       hasVideoToShow,
+       i18n,
+       isBlocked,
++      serviceId,
+       showErrorDialog,
+       showMissingMediaKeys,
+       title,
+diff --git a/ts/components/GroupDialog.dom.tsx b/ts/components/GroupDialog.dom.tsx
+index 0ffd6d742..13f92c555 100644
+--- a/ts/components/GroupDialog.dom.tsx
++++ b/ts/components/GroupDialog.dom.tsx
+@@ -117,6 +117,7 @@ function Contacts({
+           />
+           <ContactName
+             module="module-GroupDialog__contacts__contact__name"
++            serviceId={contact.serviceId}
+             title={contact.title}
+           />
+         </li>
+diff --git a/ts/components/IncomingCallBar.dom.tsx b/ts/components/IncomingCallBar.dom.tsx
+index 6590abce1..4284f8d6c 100644
+--- a/ts/components/IncomingCallBar.dom.tsx
++++ b/ts/components/IncomingCallBar.dom.tsx
+@@ -41,6 +41,7 @@ export type PropsType = {
+     | 'name'
+     | 'phoneNumber'
+     | 'profileName'
++    | 'serviceId'
+     | 'title'
+     | 'type'
+   >;
+@@ -210,6 +211,7 @@ export function IncomingCallBar(props: PropsType): JSX.Element | null {
+     color,
+     phoneNumber,
+     profileName,
++    serviceId,
+     title,
+     type: conversationType,
+   } = conversation;
+@@ -221,7 +223,7 @@ export function IncomingCallBar(props: PropsType): JSX.Element | null {
+   switch (props.callMode) {
+     case CallMode.Direct:
+       ({ isVideoCall } = props);
+-      headerNode = <ContactName title={title} />;
++      headerNode = <ContactName serviceId={serviceId} title={title} />;
+       messageNode = isVideoCall
+         ? i18n('icu:incomingVideoCall')
+         : i18n('icu:incomingAudioCall');
+diff --git a/ts/components/NewlyCreatedGroupInvitedContactsDialog.dom.tsx b/ts/components/NewlyCreatedGroupInvitedContactsDialog.dom.tsx
+index 57b91d926..20245fb2e 100644
+--- a/ts/components/NewlyCreatedGroupInvitedContactsDialog.dom.tsx
++++ b/ts/components/NewlyCreatedGroupInvitedContactsDialog.dom.tsx
+@@ -37,7 +37,14 @@ export function NewlyCreatedGroupInvitedContactsDialog({
+           <I18n
+             i18n={i18n}
+             id="icu:NewlyCreatedGroupInvitedContactsDialog--body--user-paragraph--one"
+-            components={{ name: <ContactName title={contact.title} /> }}
++            components={{
++              name: (
++                <ContactName
++                  serviceId={contact.serviceId}
++                  title={contact.title}
++                />
++              ),
++            }}
+           />
+         </GroupDialog.Paragraph>
+         <GroupDialog.Paragraph>
+diff --git a/ts/components/StoryDetailsModal.dom.tsx b/ts/components/StoryDetailsModal.dom.tsx
+index 6e0f51ba6..e24aae573 100644
+--- a/ts/components/StoryDetailsModal.dom.tsx
++++ b/ts/components/StoryDetailsModal.dom.tsx
+@@ -144,7 +144,10 @@ export function StoryDetailsModal({
+                       title={contact.title}
+                     />
+                     <div className="StoryDetailsModal__contact__text">
+-                      <ContactName title={contact.title} />
++                      <ContactName
++                        serviceId={contact.serviceId}
++                        title={contact.title}
++                      />
+                     </div>
+                     {status.updatedAt && (
+                       <Time
+@@ -184,7 +187,10 @@ export function StoryDetailsModal({
+             />
+             <div className="StoryDetailsModal__contact__text">
+               <div className="StoryDetailsModal__contact__name">
+-                <ContactName title={sender.title} />
++                <ContactName
++                  serviceId={sender.serviceId}
++                  title={sender.title}
++                />
+               </div>
+             </div>
+             <Time
+diff --git a/ts/components/StoryViewsNRepliesModal.dom.tsx b/ts/components/StoryViewsNRepliesModal.dom.tsx
+index 86b6257da..b9340a568 100644
+--- a/ts/components/StoryViewsNRepliesModal.dom.tsx
++++ b/ts/components/StoryViewsNRepliesModal.dom.tsx
+@@ -410,7 +410,10 @@ export function StoryViewsNRepliesModal({
+                 title={view.recipient.title}
+               />
+               <span className="StoryViewsNRepliesModal__view--name">
+-                <ContactName title={view.recipient.title} />
++                <ContactName
++                  serviceId={view.recipient.serviceId}
++                  title={view.recipient.title}
++                />
+               </span>
+             </div>
+             {view.updatedAt && (
+@@ -646,6 +649,7 @@ function ReplyOrReactionMessage({
+             <div className="StoryViewsNRepliesModal__reply--title">
+               <ContactName
+                 contactNameColor={reply.contactNameColor}
++                serviceId={reply.author.serviceId}
+                 title={reply.author.isMe ? i18n('icu:you') : reply.author.title}
+               />
+             </div>
+diff --git a/ts/components/VesperTitleBar.dom.tsx b/ts/components/VesperTitleBar.dom.tsx
+index c5ed30928..e23bf8af4 100644
+--- a/ts/components/VesperTitleBar.dom.tsx
++++ b/ts/components/VesperTitleBar.dom.tsx
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Signal Messenger, LLC
++// Copyright 2026 Vesper contributors
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import type {
+diff --git a/ts/components/conversation/AboutContactModal.dom.tsx b/ts/components/conversation/AboutContactModal.dom.tsx
+index fa559e0cc..8db52fb59 100644
+--- a/ts/components/conversation/AboutContactModal.dom.tsx
++++ b/ts/components/conversation/AboutContactModal.dom.tsx
+@@ -22,6 +22,8 @@ import { missingEmojiPlaceholder } from '../../types/GroupMemberLabels.std.ts';
+ import type { ConversationType } from '../../state/ducks/conversations.preload.ts';
+ import type { LocalizerType } from '../../types/Util.std.ts';
+ import { Emoji } from '../../axo/emoji.std.ts';
++import { OfficialChatInlineBadge } from './OfficialChatInlineBadge.dom.tsx';
++import { isVesperAuthor } from '../../util/isVesperAuthor.std.ts';
+ 
+ function muted(parts: Array<string | JSX.Element>) {
+   return (
+@@ -75,6 +77,7 @@ export function AboutContactModal({
+   onOpenNotePreviewModal,
+ }: PropsType): JSX.Element {
+   const { avatarUrl, hasAvatar, isMe } = contact;
++  const showVesperDeveloper = isVesperAuthor(contact);
+ 
+   // If hasAvatar is true, we show the download button instead of blur
+   const enableClickToLoad = !avatarUrl && !isMe && hasAvatar;
+@@ -261,6 +264,14 @@ export function AboutContactModal({
+           nameElement
+         )}
+       </div>
++      {showVesperDeveloper ? (
++        <div className="AboutContactModal__row">
++          <span className="AboutContactModal__row__icon AboutContactModal__row__icon--vesper-developer">
++            <OfficialChatInlineBadge />
++          </span>
++          {i18n('icu:Vesper__AboutContactModal__Developer')}
++        </div>
++      ) : null}
+       {!isMe && !fromOrAddedByTrustedContact ? (
+         <div className="AboutContactModal__row">
+           <i
+diff --git a/ts/components/conversation/ContactSpoofingReviewDialogPerson.dom.tsx b/ts/components/conversation/ContactSpoofingReviewDialogPerson.dom.tsx
+index f3f1e7b33..ece6e14ce 100644
+--- a/ts/components/conversation/ContactSpoofingReviewDialogPerson.dom.tsx
++++ b/ts/components/conversation/ContactSpoofingReviewDialogPerson.dom.tsx
+@@ -68,6 +68,7 @@ export function ContactSpoofingReviewDialogPerson({
+   const name = (
+     <ContactName
+       module="module-ContactSpoofingReviewDialogPerson__info__contact-name"
++      serviceId={conversation.serviceId}
+       title={conversation.title}
+     />
+   );
+diff --git a/ts/components/conversation/GroupNotification.dom.tsx b/ts/components/conversation/GroupNotification.dom.tsx
+index 6edc5dee7..3198e829f 100644
+--- a/ts/components/conversation/GroupNotification.dom.tsx
++++ b/ts/components/conversation/GroupNotification.dom.tsx
+@@ -55,7 +55,7 @@ function GroupNotificationChange({
+           key={`external-${contact.id}`}
+           className="module-group-notification__contact"
+         >
+-          <ContactName title={contact.title} />
++          <ContactName serviceId={contact.serviceId} title={contact.title} />
+         </span>
+       );
+     })
+@@ -159,7 +159,9 @@ export function GroupNotification({
+     <I18n
+       i18n={i18n}
+       id="icu:updatedTheGroup"
+-      components={{ name: <ContactName title={from.title} /> }}
++      components={{
++        name: <ContactName serviceId={from.serviceId} title={from.title} />,
++      }}
+     />
+   );
+ 
+diff --git a/ts/components/conversation/GroupV1Migration.dom.tsx b/ts/components/conversation/GroupV1Migration.dom.tsx
+index c94bbfdfb..96feaa005 100644
+--- a/ts/components/conversation/GroupV1Migration.dom.tsx
++++ b/ts/components/conversation/GroupV1Migration.dom.tsx
+@@ -129,7 +129,12 @@ function renderUsers({
+ 
+   if (members && count === 1) {
+     // oxlint-disable-next-line typescript/no-non-null-assertion
+-    const contact = <ContactName title={members[0]!.title} />;
++    const contact = (
++      <ContactName
++        serviceId={members[0]!.serviceId}
++        title={members[0]!.title}
++      />
++    );
+     return (
+       <p>
+         {kind === 'invited' && (
+diff --git a/ts/components/conversation/Message.dom.tsx b/ts/components/conversation/Message.dom.tsx
+index e4f2cd4e8..4243dcf19 100644
+--- a/ts/components/conversation/Message.dom.tsx
++++ b/ts/components/conversation/Message.dom.tsx
+@@ -87,6 +87,7 @@ import {
+   SizeObserver,
+   useSizeObserver,
+ } from '../../hooks/useSizeObserver.dom.tsx';
++import { shouldCompactDeletionRequestedPill } from '../../util/vesperDeleteForEveryone.std.ts';
+ 
+ import type { PreferredBadgeSelectorType } from '../../state/selectors/badges.preload.ts';
+ import type {
+@@ -278,6 +279,7 @@ export type PropsData = {
+     authorId: string;
+     authorPhoneNumber?: string;
+     authorProfileName?: string;
++    authorServiceId?: ServiceIdString;
+     authorTitle: string;
+     authorLabel?: MemberLabelType;
+     authorName?: string;
+@@ -315,9 +317,10 @@ export type PropsData = {
+   vesperDeletionRequested?: boolean;
+   deletedForEveryoneByAdmin?: {
+     conversationId: string;
+-    title: string;
+     contactNameColor: ContactNameColorType;
+     isMe: boolean;
++    serviceId?: ServiceIdString;
++    title: string;
+   };
+   attachmentDroppedDueToSize?: boolean;
+ 
+@@ -446,21 +449,29 @@ type MessageReactionsProps = {
+ };
+ 
+ type DeletionRequestedPillProps = {
++  adjacentContentRef: RefObject<HTMLSpanElement | null>;
+   label: string;
+   messageBubbleWidth: number;
+ };
+ 
+ function DeletionRequestedPill({
++  adjacentContentRef,
+   label,
+   messageBubbleWidth,
+ }: DeletionRequestedPillProps): JSX.Element {
+   const measurementRef = useRef<HTMLSpanElement | null>(null);
++  const adjacentContentSize = useSizeObserver(adjacentContentRef);
+   const fullPillSize = useSizeObserver(measurementRef);
+   const compact =
+-    messageBubbleWidth > 0 &&
++    adjacentContentSize != null &&
++    !adjacentContentSize.hidden &&
+     fullPillSize != null &&
+     !fullPillSize.hidden &&
+-    fullPillSize.width >= messageBubbleWidth - 5;
++    shouldCompactDeletionRequestedPill({
++      adjacentContentWidth: adjacentContentSize.width,
++      fullPillWidth: fullPillSize.width,
++      messageBubbleWidth,
++    });
+ 
+   return (
+     <>
+@@ -505,6 +516,7 @@ const MessageReactions = forwardRef(function MessageReactions(
+   const ordered = useGroupedAndOrderedReactions(reactions, 'parent');
+ 
+   const reactionsContainerRefMerger = useRef(createRefMerger());
++  const reactionItemsRef = useRef<HTMLSpanElement | null>(null);
+ 
+   // Take the first three groups for rendering
+   const toRender = take(ordered, 3).map(group => {
+@@ -571,77 +583,83 @@ const MessageReactions = forwardRef(function MessageReactions(
+           >
+             {deletionRequested && (
+               <DeletionRequestedPill
++                adjacentContentRef={reactionItemsRef}
+                 label={i18n('icu:Vesper__Message__DeletionRequested')}
+                 messageBubbleWidth={messageBubbleWidth}
+               />
+             )}
+-            {toRender.map((re, i) => {
+-              const isLast = i === toRender.length - 1;
+-              const isMore = isLast && someNotRendered;
+-              const isMoreWithMe = isMore && notRenderedIsMe;
+-
+-              return (
+-                <button
+-                  aria-label={re.label}
+-                  type="button"
+-                  // oxlint-disable-next-line react/no-array-index-key
+-                  key={`${re.emoji}-${i}`}
+-                  className={classNames(
+-                    'module-message__reactions__reaction',
+-                    re.count > 1
+-                      ? 'module-message__reactions__reaction--with-count'
+-                      : null,
+-                    outgoing
+-                      ? 'module-message__reactions__reaction--outgoing'
+-                      : 'module-message__reactions__reaction--incoming',
+-                    isMoreWithMe || (re.isMe && !isMoreWithMe)
+-                      ? 'module-message__reactions__reaction--is-me'
+-                      : null
+-                  )}
+-                  onClick={e => {
+-                    e.stopPropagation();
+-                    e.preventDefault();
+-                    toggleReactionViewer(false);
+-                  }}
+-                  onKeyDown={e => {
+-                    // Prevent enter key from opening stickers/attachments
+-                    if (e.key === 'Enter') {
++            <span
++              className="module-message__reactions__items"
++              ref={reactionItemsRef}
++            >
++              {toRender.map((re, i) => {
++                const isLast = i === toRender.length - 1;
++                const isMore = isLast && someNotRendered;
++                const isMoreWithMe = isMore && notRenderedIsMe;
++
++                return (
++                  <button
++                    aria-label={re.label}
++                    type="button"
++                    // oxlint-disable-next-line react/no-array-index-key
++                    key={`${re.emoji}-${i}`}
++                    className={classNames(
++                      'module-message__reactions__reaction',
++                      re.count > 1
++                        ? 'module-message__reactions__reaction--with-count'
++                        : null,
++                      outgoing
++                        ? 'module-message__reactions__reaction--outgoing'
++                        : 'module-message__reactions__reaction--incoming',
++                      isMoreWithMe || (re.isMe && !isMoreWithMe)
++                        ? 'module-message__reactions__reaction--is-me'
++                        : null
++                    )}
++                    onClick={e => {
+                       e.stopPropagation();
+-                    }
+-                  }}
+-                >
+-                  {isMore ? (
+-                    <span
+-                      className={classNames(
+-                        'module-message__reactions__reaction__count',
+-                        'module-message__reactions__reaction__count--no-emoji',
+-                        isMoreWithMe
+-                          ? 'module-message__reactions__reaction__count--is-me'
+-                          : null
+-                      )}
+-                    >
+-                      +{maybeNotRenderedTotal}
+-                    </span>
+-                  ) : (
+-                    <>
+-                      <ReactionEmoji emoji={re.emoji} />
+-                      {re.count > 1 ? (
+-                        <span
+-                          className={classNames(
+-                            'module-message__reactions__reaction__count',
+-                            re.isMe
+-                              ? 'module-message__reactions__reaction__count--is-me'
+-                              : null
+-                          )}
+-                        >
+-                          {re.count}
+-                        </span>
+-                      ) : null}
+-                    </>
+-                  )}
+-                </button>
+-              );
+-            })}
++                      e.preventDefault();
++                      toggleReactionViewer(false);
++                    }}
++                    onKeyDown={e => {
++                      // Prevent enter key from opening stickers/attachments
++                      if (e.key === 'Enter') {
++                        e.stopPropagation();
++                      }
++                    }}
++                  >
++                    {isMore ? (
++                      <span
++                        className={classNames(
++                          'module-message__reactions__reaction__count',
++                          'module-message__reactions__reaction__count--no-emoji',
++                          isMoreWithMe
++                            ? 'module-message__reactions__reaction__count--is-me'
++                            : null
++                        )}
++                      >
++                        +{maybeNotRenderedTotal}
++                      </span>
++                    ) : (
++                      <>
++                        <ReactionEmoji emoji={re.emoji} />
++                        {re.count > 1 ? (
++                          <span
++                            className={classNames(
++                              'module-message__reactions__reaction__count',
++                              re.isMe
++                                ? 'module-message__reactions__reaction__count--is-me'
++                                : null
++                            )}
++                          >
++                            {re.count}
++                          </span>
++                        ) : null}
++                      </>
++                    )}
++                  </button>
++                );
++              })}
++            </span>
+           </div>
+         )}
+       </Reference>
+@@ -2197,6 +2215,7 @@ export class Message extends PureComponent<Props, State> {
+         rawAttachment={quote.rawAttachment}
+         payment={quote.payment}
+         isIncoming={isIncoming}
++        authorServiceId={quote.authorServiceId}
+         authorTitle={quote.authorTitle}
+         authorLabel={quote.authorLabel}
+         bodyRanges={quote.bodyRanges}
+@@ -2448,10 +2467,11 @@ export class Message extends PureComponent<Props, State> {
+                 admin: (
+                   <strong>
+                     <ContactName
+-                      title={deletedForEveryoneByAdmin.title}
+                       contactNameColor={
+                         deletedForEveryoneByAdmin.contactNameColor
+                       }
++                      serviceId={deletedForEveryoneByAdmin.serviceId}
++                      title={deletedForEveryoneByAdmin.title}
+                       onClick={() => {
+                         showContactModal({
+                           conversationId,
+@@ -2475,9 +2495,10 @@ export class Message extends PureComponent<Props, State> {
+             components={{
+               name: (
+                 <ContactName
++                  firstName={author.firstName}
+                   preferFirstName
++                  serviceId={author.serviceId}
+                   title={author.title}
+-                  firstName={author.firstName}
+                 />
+               ),
+             }}
+@@ -3417,6 +3438,7 @@ export class Message extends PureComponent<Props, State> {
+       renderMessageContextMenu,
+       text,
+       textDirection,
++      vesperDeletionRequested,
+     } = this.props;
+     const { isTargeted, imageBroken } = this.state;
+ 
+@@ -3489,43 +3511,54 @@ export class Message extends PureComponent<Props, State> {
+       return children;
+     }
+ 
++    const renderMessageWithReactionRail = (
++      messageBubbleRef?: RefObject<HTMLDivElement | null>,
++      messageBubbleWidth = 0
++    ): JSX.Element => (
++      <>
++        {maybeWrapWithContextMenu(
++          // the keyboard handler is a level higher in hierarchy due to selection
++          //  oxlint-disable-next-line jsx-a11y/click-events-have-key-events
++          <div
++            className={containerClassnames}
++            id={`message-accessibility-contents:${id}`}
++            style={containerStyles}
++            role="row"
++            onClick={this.handleClick}
++            onDoubleClick={ev => {
++              // Prevent double click from triggering the replyToMessage action
++              ev.stopPropagation();
++            }}
++            ref={messageBubbleRef}
++            tabIndex={-1}
++            inert={isSelectMode ? true : undefined}
++          >
++            {this.#renderAuthor()}
++            <div dir={TextDirectionToDirAttribute[textDirection]}>
++              {this.renderContents()}
++            </div>
++          </div>
++        )}
++        {this.renderReactions(direction === 'outgoing', messageBubbleWidth)}
++      </>
++    );
++
+     return (
+       <div className="module-message__container-outer">
+-        <SizeObserver>
+-          {(messageBubbleRef, messageBubbleSize) => (
+-            <>
+-              {maybeWrapWithContextMenu(
+-                // the keyboard handler is a level higher in hierarchy due to selection
+-                //  oxlint-disable-next-line jsx-a11y/click-events-have-key-events
+-                <div
+-                  className={containerClassnames}
+-                  id={`message-accessibility-contents:${id}`}
+-                  style={containerStyles}
+-                  role="row"
+-                  onClick={this.handleClick}
+-                  onDoubleClick={ev => {
+-                    // Prevent double click from triggering the replyToMessage action
+-                    ev.stopPropagation();
+-                  }}
+-                  ref={messageBubbleRef}
+-                  tabIndex={-1}
+-                  inert={isSelectMode ? true : undefined}
+-                >
+-                  {this.#renderAuthor()}
+-                  <div dir={TextDirectionToDirAttribute[textDirection]}>
+-                    {this.renderContents()}
+-                  </div>
+-                </div>
+-              )}
+-              {this.renderReactions(
+-                direction === 'outgoing',
++        {vesperDeletionRequested ? (
++          <SizeObserver>
++            {(messageBubbleRef, messageBubbleSize) =>
++              renderMessageWithReactionRail(
++                messageBubbleRef,
+                 messageBubbleSize != null && !messageBubbleSize.hidden
+                   ? messageBubbleSize.width
+                   : 0
+-              )}
+-            </>
+-          )}
+-        </SizeObserver>
++              )
++            }
++          </SizeObserver>
++        ) : (
++          renderMessageWithReactionRail()
++        )}
+       </div>
+     );
+   }
+diff --git a/ts/components/conversation/MessageDetail.dom.tsx b/ts/components/conversation/MessageDetail.dom.tsx
+index 96be63c22..7edbb8b71 100644
+--- a/ts/components/conversation/MessageDetail.dom.tsx
++++ b/ts/components/conversation/MessageDetail.dom.tsx
+@@ -51,6 +51,7 @@ export type Contact = Pick<
+   | 'isMe'
+   | 'phoneNumber'
+   | 'profileName'
++  | 'serviceId'
+   | 'title'
+ > & {
+   status?: SendStatus;
+@@ -215,7 +216,7 @@ export function MessageDetail({
+         {renderAvatar(contact)}
+         <div className="module-message-detail__contact__text">
+           <div className="module-message-detail__contact__name">
+-            <ContactName title={contact.title} />
++            <ContactName serviceId={contact.serviceId} title={contact.title} />
+           </div>
+           {contactErrors.map(contactError => (
+             <div
+diff --git a/ts/components/conversation/Quote.dom.tsx b/ts/components/conversation/Quote.dom.tsx
+index cd7bdf974..07cf5c5b6 100644
+--- a/ts/components/conversation/Quote.dom.tsx
++++ b/ts/components/conversation/Quote.dom.tsx
+@@ -34,6 +34,7 @@ import type { AnyPaymentEvent } from '../../types/Payment.std.ts';
+ import type { QuotedAttachmentType } from '../../model-types.d.ts';
+ import type { MemberLabelType } from '../../types/GroupMemberLabels.std.ts';
+ import type { Emoji } from '../../axo/emoji.std.ts';
++import type { ServiceIdString } from '../../types/ServiceId.std.ts';
+ 
+ const { noop } = lodash;
+ 
+@@ -46,6 +47,7 @@ export type QuotedAttachmentForUIType = Pick<
+   Pick<AttachmentType, 'isVoiceMessage' | 'fileName' | 'textAttachment'>;
+ 
+ export type Props = {
++  authorServiceId?: ServiceIdString;
+   authorTitle: string;
+   authorLabel?: MemberLabelType;
+   conversationColor: ConversationColorType;
+@@ -160,6 +162,7 @@ export function Quote(props: Props): JSX.Element | null {
+     onClose,
+     text,
+     bodyRanges,
++    authorServiceId,
+     authorTitle,
+     authorLabel,
+     conversationTitle,
+@@ -469,7 +472,7 @@ export function Quote(props: Props): JSX.Element | null {
+     const title = isFromMe ? (
+       i18n('icu:you')
+     ) : (
+-      <ContactName title={authorTitle} />
++      <ContactName serviceId={authorServiceId} title={authorTitle} />
+     );
+     const author = isStoryReply ? (
+       <>
+diff --git a/ts/components/conversation/ReactionViewer.dom.tsx b/ts/components/conversation/ReactionViewer.dom.tsx
+index 81ed085ef..7a2a6754a 100644
+--- a/ts/components/conversation/ReactionViewer.dom.tsx
++++ b/ts/components/conversation/ReactionViewer.dom.tsx
+@@ -38,6 +38,7 @@ export type Reaction = {
+     | 'isMe'
+     | 'phoneNumber'
+     | 'profileName'
++    | 'serviceId'
+     | 'title'
+   >;
+ };
+@@ -266,6 +267,7 @@ export const ReactionViewer = forwardRef<HTMLDivElement, Props>(
+                 ) : (
+                   <ContactName
+                     module="module-reaction-viewer__body__row__name__contact-name"
++                    serviceId={from.serviceId}
+                     title={from.title}
+                   />
+                 )}
+diff --git a/ts/components/conversation/RemoveGroupMemberConfirmationDialog.dom.tsx b/ts/components/conversation/RemoveGroupMemberConfirmationDialog.dom.tsx
+index 0f9b0a27e..167512e4e 100644
+--- a/ts/components/conversation/RemoveGroupMemberConfirmationDialog.dom.tsx
++++ b/ts/components/conversation/RemoveGroupMemberConfirmationDialog.dom.tsx
+@@ -28,7 +28,12 @@ export function RemoveGroupMemberConfirmationDialog({
+     group.accessControlAddFromInviteLink
+   );
+ 
+-  const contactName = <ContactName title={conversation.title} />;
++  const contactName = (
++    <ContactName
++      serviceId={conversation.serviceId}
++      title={conversation.title}
++    />
++  );
+ 
+   return (
+     <AxoConfirmDialog.Root
+diff --git a/ts/components/conversation/SafetyNumberNotification.dom.tsx b/ts/components/conversation/SafetyNumberNotification.dom.tsx
+index 2e0fac155..a428c301e 100644
+--- a/ts/components/conversation/SafetyNumberNotification.dom.tsx
++++ b/ts/components/conversation/SafetyNumberNotification.dom.tsx
+@@ -8,9 +8,11 @@ import { SystemMessage } from './SystemMessage.dom.tsx';
+ import { ContactName } from './ContactName.dom.tsx';
+ import { I18n } from '../I18n.dom.tsx';
+ import type { LocalizerType } from '../../types/Util.std.ts';
++import type { ServiceIdString } from '../../types/ServiceId.std.ts';
+ 
+ export type ContactType = {
+   id: string;
++  serviceId?: ServiceIdString;
+   title: string;
+ };
+ 
+@@ -41,8 +43,9 @@ export function SafetyNumberNotification({
+       className="module-safety-number-notification__contact"
+     >
+       <ContactName
+-        title={contact.title}
+         module="module-safety-number-notification__contact"
++        serviceId={contact.serviceId}
++        title={contact.title}
+       />
+     </span>
+   );
+diff --git a/ts/components/conversation/TimerNotification.dom.tsx b/ts/components/conversation/TimerNotification.dom.tsx
+index 7d6d7f33f..4ac056e1e 100644
+--- a/ts/components/conversation/TimerNotification.dom.tsx
++++ b/ts/components/conversation/TimerNotification.dom.tsx
+@@ -10,6 +10,7 @@ import type { LocalizerType } from '../../types/Util.std.ts';
+ import * as expirationTimer from '../../util/expirationTimer.std.ts';
+ import type { DurationInSeconds } from '../../util/durations/index.std.ts';
+ import { createLogger } from '../../logging/log.std.ts';
++import type { ServiceIdString } from '../../types/ServiceId.std.ts';
+ 
+ const log = createLogger('TimerNotification');
+ 
+@@ -23,6 +24,7 @@ export type TimerNotificationType =
+ //   type.
+ 
+ export type PropsData = {
++  sourceServiceId?: ServiceIdString;
+   type: TimerNotificationType;
+   title: string;
+ } & (
+@@ -40,7 +42,7 @@ type PropsHousekeeping = {
+ export type Props = PropsData & PropsHousekeeping;
+ 
+ export function TimerNotification(props: Props): JSX.Element {
+-  const { disabled, i18n, title, type } = props;
++  const { disabled, i18n, sourceServiceId, title, type } = props;
+ 
+   let timespan: string;
+   if (disabled) {
+@@ -49,7 +51,9 @@ export function TimerNotification(props: Props): JSX.Element {
+     timespan = expirationTimer.format(i18n, props.expireTimer);
+   }
+ 
+-  const name = <ContactName key="external-1" title={title} />;
++  const name = (
++    <ContactName key="external-1" serviceId={sourceServiceId} title={title} />
++  );
+ 
+   let message: ReactNode;
+   switch (type) {
+diff --git a/ts/components/conversation/UnsupportedMessage.dom.tsx b/ts/components/conversation/UnsupportedMessage.dom.tsx
+index 15b65e861..df74b6bfb 100644
+--- a/ts/components/conversation/UnsupportedMessage.dom.tsx
++++ b/ts/components/conversation/UnsupportedMessage.dom.tsx
+@@ -8,6 +8,7 @@ import { Button, ButtonSize, ButtonVariant } from '../Button.dom.tsx';
+ import { ContactName } from './ContactName.dom.tsx';
+ import { I18n } from '../I18n.dom.tsx';
+ import type { LocalizerType } from '../../types/Util.std.ts';
++import type { ServiceIdString } from '../../types/ServiceId.std.ts';
+ import { PRODUCTION_DOWNLOAD_URL } from '../../types/support.std.ts';
+ import { openLinkInWebBrowser } from '../../util/openLinkInWebBrowser.dom.ts';
+ 
+@@ -15,6 +16,7 @@ export type ContactType = {
+   id: string;
+   phoneNumber?: string;
+   profileName?: string;
++  serviceId?: ServiceIdString;
+   title: string;
+   name?: string;
+   isMe: boolean;
+@@ -36,8 +38,9 @@ function UnsupportedMessageContents({ canProcessNow, contact, i18n }: Props) {
+   const contactName = (
+     <span key="external-1" className="module-unsupported-message__contact">
+       <ContactName
+-        title={contact.title}
+         module="module-unsupported-message__contact"
++        serviceId={contact.serviceId}
++        title={contact.title}
+       />
+     </span>
+   );
+diff --git a/ts/components/conversation/VerificationNotification.dom.tsx b/ts/components/conversation/VerificationNotification.dom.tsx
+index daae4bb68..d528291af 100644
+--- a/ts/components/conversation/VerificationNotification.dom.tsx
++++ b/ts/components/conversation/VerificationNotification.dom.tsx
+@@ -7,10 +7,14 @@ import { SystemMessage } from './SystemMessage.dom.tsx';
+ import { ContactName } from './ContactName.dom.tsx';
+ import { I18n } from '../I18n.dom.tsx';
+ import type { LocalizerType } from '../../types/Util.std.ts';
++import type { ServiceIdString } from '../../types/ServiceId.std.ts';
+ 
+ import { missingCaseError } from '../../util/missingCaseError.std.ts';
+ 
+-type Contact = { title: string };
++type Contact = {
++  serviceId?: ServiceIdString;
++  title: string;
++};
+ 
+ export type PropsData = {
+   type: 'markVerified' | 'markNotVerified';
+@@ -33,8 +37,9 @@ function VerificationNotificationContents({
+   const name = (
+     <ContactName
+       key="external-1"
+-      title={contact.title}
+       module="module-verification-notification__contact"
++      serviceId={contact.serviceId}
++      title={contact.title}
+     />
+   );
+ 
+diff --git a/ts/components/conversation/conversation-details/AddGroupMembersModal/ConfirmAdditionsModal.dom.tsx b/ts/components/conversation/conversation-details/AddGroupMembersModal/ConfirmAdditionsModal.dom.tsx
+index d72068278..7d9ab30a5 100644
+--- a/ts/components/conversation/conversation-details/AddGroupMembersModal/ConfirmAdditionsModal.dom.tsx
++++ b/ts/components/conversation/conversation-details/AddGroupMembersModal/ConfirmAdditionsModal.dom.tsx
+@@ -45,7 +45,12 @@ export function ConfirmAdditionsModal({
+         i18n={i18n}
+         id="icu:AddGroupMembersModal--confirm-title--one"
+         components={{
+-          person: <ContactName title={firstContact.title} />,
++          person: (
++            <ContactName
++              serviceId={firstContact.serviceId}
++              title={firstContact.title}
++            />
++          ),
+           group: groupTitleNode,
+         }}
+       />
+diff --git a/ts/components/conversation/poll-message/PollVotesModal.dom.tsx b/ts/components/conversation/poll-message/PollVotesModal.dom.tsx
+index 12195d044..6805fdfb1 100644
+--- a/ts/components/conversation/poll-message/PollVotesModal.dom.tsx
++++ b/ts/components/conversation/poll-message/PollVotesModal.dom.tsx
+@@ -122,8 +122,9 @@ export function PollVotesModal({
+                             />
+                             <div className={tw('min-w-0 flex-1')}>
+                               <ContactName
+-                                title={vote.from.title}
+                                 module={tw('type-body-large text-primary')}
++                                serviceId={vote.from.serviceId}
++                                title={vote.from.title}
+                               />
+                             </div>
+                           </div>
+diff --git a/ts/components/conversationList/ContactCheckbox.dom.tsx b/ts/components/conversationList/ContactCheckbox.dom.tsx
+index 34b829574..41f92f911 100644
+--- a/ts/components/conversationList/ContactCheckbox.dom.tsx
++++ b/ts/components/conversationList/ContactCheckbox.dom.tsx
+@@ -64,6 +64,7 @@ export const ContactCheckbox: FunctionComponent<PropsType> = memo(
+     onClick,
+     phoneNumber,
+     profileName,
++    serviceId,
+     theme,
+     title,
+     type,
+@@ -72,12 +73,17 @@ export const ContactCheckbox: FunctionComponent<PropsType> = memo(
+ 
+     const headerName = isMe ? (
+       <ContactName
++        isMe={isMe}
+         module={HEADER_CONTACT_NAME_CLASS_NAME}
++        serviceId={serviceId}
+         title={i18n('icu:noteToSelf')}
+-        isMe={isMe}
+       />
+     ) : (
+-      <ContactName module={HEADER_CONTACT_NAME_CLASS_NAME} title={title} />
++      <ContactName
++        module={HEADER_CONTACT_NAME_CLASS_NAME}
++        serviceId={serviceId}
++        title={title}
++      />
+     );
+ 
+     let messageText: undefined | string | JSX.Element;
+diff --git a/ts/components/conversationList/ContactListItem.dom.tsx b/ts/components/conversationList/ContactListItem.dom.tsx
+index dbca79a42..019ba623d 100644
+--- a/ts/components/conversationList/ContactListItem.dom.tsx
++++ b/ts/components/conversationList/ContactListItem.dom.tsx
+@@ -141,6 +141,7 @@ export const ContactListItem: FunctionComponent<PropsType> = memo(
+       <ContactName
+         isMe={isMe}
+         module={HEADER_CONTACT_NAME_CLASS_NAME}
++        serviceId={serviceId}
+         title={i18n('icu:noteToSelf')}
+       />
+     ) : (
+@@ -182,7 +183,9 @@ export const ContactListItem: FunctionComponent<PropsType> = memo(
+               i18n={i18n}
+               id="icu:MessageRequests--block-direct-confirm-title"
+               components={{
+-                title: <ContactName key="name" title={title} />,
++                title: (
++                  <ContactName key="name" serviceId={serviceId} title={title} />
++                ),
+               }}
+             />
+           }
+@@ -212,7 +215,13 @@ export const ContactListItem: FunctionComponent<PropsType> = memo(
+                 i18n={i18n}
+                 id="icu:ContactListItem__remove-system--title"
+                 components={{
+-                  title: <ContactName key="name" title={title} />,
++                  title: (
++                    <ContactName
++                      key="name"
++                      serviceId={serviceId}
++                      title={title}
++                    />
++                  ),
+                 }}
+               />
+             }
+@@ -233,7 +242,13 @@ export const ContactListItem: FunctionComponent<PropsType> = memo(
+                 i18n={i18n}
+                 id="icu:ContactListItem__remove--title"
+                 components={{
+-                  title: <ContactName key="name" title={title} />,
++                  title: (
++                    <ContactName
++                      key="name"
++                      serviceId={serviceId}
++                      title={title}
++                    />
++                  ),
+                 }}
+               />
+             }
+diff --git a/ts/components/conversationList/ConversationListItem.dom.tsx b/ts/components/conversationList/ConversationListItem.dom.tsx
+index 12d5db33b..a05d6ed7e 100644
+--- a/ts/components/conversationList/ConversationListItem.dom.tsx
++++ b/ts/components/conversationList/ConversationListItem.dom.tsx
+@@ -116,8 +116,9 @@ export const ConversationListItem: FunctionComponent<Props> = memo(
+       <>
+         {isMe ? (
+           <ContactName
+-            module={HEADER_CONTACT_NAME_CLASS_NAME}
+             isMe={isMe}
++            module={HEADER_CONTACT_NAME_CLASS_NAME}
++            serviceId={serviceId}
+             title={i18n('icu:noteToSelf')}
+           />
+         ) : (
+diff --git a/ts/components/conversationList/MessageSearchResult.dom.tsx b/ts/components/conversationList/MessageSearchResult.dom.tsx
+index 145d91f9b..3b3707057 100644
+--- a/ts/components/conversationList/MessageSearchResult.dom.tsx
++++ b/ts/components/conversationList/MessageSearchResult.dom.tsx
+@@ -47,13 +47,14 @@ export type PropsDataType = {
+     | 'isMe'
+     | 'phoneNumber'
+     | 'profileName'
++    | 'serviceId'
+     | 'title'
+     | 'type'
+   >;
+ 
+   to: Pick<
+     ConversationType,
+-    'isMe' | 'phoneNumber' | 'profileName' | 'title' | 'type'
++    'isMe' | 'phoneNumber' | 'profileName' | 'serviceId' | 'title' | 'type'
+   >;
+ };
+ 
+@@ -70,13 +71,14 @@ const renderPerson = (
+   i18n: LocalizerType,
+   person: Readonly<{
+     isMe?: boolean;
++    serviceId?: ConversationType['serviceId'];
+     title: string;
+   }>
+ ): JSX.Element =>
+   person.isMe ? (
+     <I18n i18n={i18n} id="icu:you" />
+   ) : (
+-    <ContactName title={person.title} />
++    <ContactName serviceId={person.serviceId} title={person.title} />
+   );
+ 
+ export const MessageSearchResult: FunctionComponent<PropsType> = memo(
+diff --git a/ts/state/selectors/message.preload.ts b/ts/state/selectors/message.preload.ts
+index f1b9e4ae7..971a4551a 100644
+--- a/ts/state/selectors/message.preload.ts
++++ b/ts/state/selectors/message.preload.ts
+@@ -462,6 +462,7 @@ const getReactionsForMessage = (
+       name,
+       phoneNumber,
+       profileName,
++      serviceId,
+       title,
+     } = c;
+ 
+@@ -475,6 +476,7 @@ const getReactionsForMessage = (
+       name,
+       phoneNumber,
+       profileName,
++      serviceId,
+       title,
+     };
+ 
+@@ -507,6 +509,7 @@ export type PollVoteWithUserType = {
+     | 'name'
+     | 'phoneNumber'
+     | 'profileName'
++    | 'serviceId'
+     | 'title'
+   >;
+ };
+@@ -740,6 +743,7 @@ export const getPropsForQuote = (
+   const authorName = contact.name;
+   const authorPhoneNumber = contact.phoneNumber;
+   const authorProfileName = contact.profileName;
++  const authorServiceId = contact.serviceId;
+   const authorTitle = contact.title;
+   const isFromMe = authorId === ourConversationId;
+ 
+@@ -767,6 +771,7 @@ export const getPropsForQuote = (
+     authorName,
+     authorPhoneNumber,
+     authorProfileName,
++    authorServiceId,
+     authorTitle,
+     bodyRanges: processBodyRanges(quote, isGroup, { conversationSelector }),
+     conversationColor,
+@@ -1482,7 +1487,11 @@ function getPropsForTimerNotification(
+   const { expireTimer, fromSync, source, sourceServiceId } = timerUpdate;
+   const disabled = !expireTimer;
+   const sourceId = sourceServiceId || source;
+-  const { id: formattedContactId, title } = conversationSelector(sourceId);
++  const {
++    id: formattedContactId,
++    serviceId: contactServiceId,
++    title,
++  } = conversationSelector(sourceId);
+ 
+   // Pacify typescript
+   type MaybeExpireTimerType =
+@@ -1502,6 +1511,7 @@ function getPropsForTimerNotification(
+       };
+ 
+   const basicProps = {
++    sourceServiceId: contactServiceId,
+     title,
+     ...maybeExpireTimer,
+     type: 'fromOther' as const,
+@@ -2198,6 +2208,7 @@ function getDeletedForEveryoneByAdmin(
+       adminConversationId
+     ),
+     isMe: adminConversation.isMe,
++    serviceId: adminConversation.serviceId,
+   };
+ }
+ 
+diff --git a/ts/test-node/VesperConfig_test.dom.ts b/ts/test-node/VesperConfig_test.dom.ts
+new file mode 100644
+index 000000000..b9573af19
+--- /dev/null
++++ b/ts/test-node/VesperConfig_test.dom.ts
+@@ -0,0 +1,127 @@
++// Copyright 2026 Vesper contributors
++// SPDX-License-Identifier: AGPL-3.0-only
++
++import { assert } from 'chai';
++
++import type { AciString } from '../types/ServiceId.std.ts';
++import {
++  getVesperConfigFlagOverride,
++  hashVesperAci,
++  maybeRefreshVesperConfig,
++  parseVesperConfig,
++  restoreVesperConfigFromStorage,
++  shouldRefreshVesperConfig,
++} from '../VesperConfig.dom.ts';
++import { DAY } from '../util/durations/index.std.ts';
++
++describe('VesperConfig', () => {
++  const aci = '00000000-0000-4000-8000-000000000001' as AciString;
++  const aciHash =
++    '11e594f481958c10e3015d0bf0447a22f068a8a647f475df15ce2c7ab4b8f3f1';
++
++  beforeEach(() => {
++    restoreVesperConfigFromStorage({
++      storage: {
++        get: () => undefined,
++        put: async () => undefined,
++      },
++    });
++  });
++
++  it('hashes the canonical lowercase ACI', () => {
++    assert.equal(hashVesperAci(aci), aciHash);
++  });
++
++  it('validates and normalizes a response', () => {
++    assert.deepEqual(
++      parseVesperConfig({
++        schemaVersion: 1,
++        developerAciHashes: ['b'.repeat(64), 'a'.repeat(64), 'a'.repeat(64)],
++        flagOverrides: [
++          { name: 'vesper.second', value: false },
++          { name: 'vesper.first', value: 42 },
++        ],
++      }),
++      {
++        schemaVersion: 1,
++        developerAciHashes: ['a'.repeat(64), 'b'.repeat(64)],
++        flagOverrides: [
++          { name: 'vesper.first', value: 42 },
++          { name: 'vesper.second', value: false },
++        ],
++      }
++    );
++    assert.throws(() =>
++      parseVesperConfig({
++        schemaVersion: 1,
++        developerAciHashes: ['not-a-hash'],
++        flagOverrides: [],
++      })
++    );
++  });
++
++  it('refreshes every internal startup and otherwise after one day', () => {
++    const now = 2 * DAY;
++    assert.isTrue(
++      shouldRefreshVesperConfig({
++        isInternalUser: true,
++        lastFetchTime: now,
++        now,
++      })
++    );
++    assert.isFalse(
++      shouldRefreshVesperConfig({
++        isInternalUser: false,
++        lastFetchTime: now - DAY + 1,
++        now,
++      })
++    );
++    assert.isTrue(
++      shouldRefreshVesperConfig({
++        isInternalUser: false,
++        lastFetchTime: now - DAY,
++        now,
++      })
++    );
++  });
++
++  it('caches a validated background response and its ETag', async () => {
++    const values = new Map<string, unknown>();
++    const storage = {
++      get: (key: string): unknown => values.get(key),
++      put: async (key: string, value: unknown): Promise<void> => {
++        values.set(key, value);
++      },
++    };
++    let requestedUrl: string | undefined;
++    const fetchFn: typeof fetch = async input => {
++      requestedUrl = String(input);
++      return Response.json(
++        {
++          schemaVersion: 1,
++          developerAciHashes: [aciHash],
++          flagOverrides: [{ name: 'desktop.internalUser', value: true }],
++        },
++        { headers: { ETag: '"config-1"' } }
++      );
++    };
++
++    assert.equal(
++      await maybeRefreshVesperConfig({
++        aci,
++        fetchFn,
++        isInternalUser: false,
++        now: DAY,
++        storage,
++      }),
++      'updated'
++    );
++    assert.equal(requestedUrl, `https://vsp.asy.st/config/${aciHash}`);
++    assert.equal(values.get('vesperConfigEtag'), '"config-1"');
++    assert.equal(values.get('vesperConfigLastFetchTime'), DAY);
++    assert.deepEqual(getVesperConfigFlagOverride('desktop.internalUser'), {
++      isPresent: true,
++      value: true,
++    });
++  });
++});
+diff --git a/ts/test-node/util/isVesperAuthor_test.std.ts b/ts/test-node/util/isVesperAuthor_test.std.ts
+index 78574c19c..4aefbc2de 100644
+--- a/ts/test-node/util/isVesperAuthor_test.std.ts
++++ b/ts/test-node/util/isVesperAuthor_test.std.ts
+@@ -1,21 +1,51 @@
+-// Copyright 2026 Signal Messenger, LLC
++// Copyright 2026 Vesper contributors
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import { assert } from 'chai';
+ 
++import type { AciString } from '../../types/ServiceId.std.ts';
+ import {
+   generateAci,
+   generatePni,
+ } from '../../test-helpers/serviceIdUtils.std.ts';
+ import { isVesperAuthor } from '../../util/isVesperAuthor.std.ts';
+-import { vesperAuthorACIs } from '../../util/vesperAuthorACIs.std.ts';
++import {
++  hashVesperAci,
++  restoreVesperConfigFromStorage,
++} from '../../VesperConfig.dom.ts';
+ 
+ describe('isVesperAuthor', () => {
+-  it('returns true for configured author ACIs', () => {
+-    assert.isNotEmpty(vesperAuthorACIs);
+-    vesperAuthorACIs.forEach(serviceId => {
+-      assert.isTrue(isVesperAuthor({ serviceId }));
++  const developerAci = '00000000-0000-4000-8000-000000000001' as AciString;
++
++  beforeEach(() => {
++    restoreVesperConfigFromStorage({
++      storage: {
++        get: () => undefined,
++        put: async () => undefined,
++      },
++    });
++  });
++
++  it('returns true for developer hashes in the cached config', () => {
++    restoreVesperConfigFromStorage({
++      storage: {
++        get: key =>
++          key === 'vesperConfig'
++            ? {
++                schemaVersion: 1,
++                developerAciHashes: [hashVesperAci(developerAci)],
++                flagOverrides: [],
++              }
++            : undefined,
++        put: async () => undefined,
++      },
+     });
++
++    assert.isTrue(isVesperAuthor({ serviceId: developerAci }));
++  });
++
++  it('has no bundled developer fallback', () => {
++    assert.isFalse(isVesperAuthor({ serviceId: developerAci }));
+   });
+ 
+   it('returns false for other identifiers', () => {
+diff --git a/ts/test-node/util/vesperDeleteForEveryone_test.std.ts b/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
+index 6c2f77ffe..62e2d0e2f 100644
+--- a/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
++++ b/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
+@@ -1,9 +1,12 @@
+-// Copyright 2026 Signal Messenger, LLC
++// Copyright 2026 Vesper contributors
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import { assert } from 'chai';
+ 
+-import { shouldKeepDeletedMessage } from '../../util/vesperDeleteForEveryone.std.ts';
++import {
++  shouldCompactDeletionRequestedPill,
++  shouldKeepDeletedMessage,
++} from '../../util/vesperDeleteForEveryone.std.ts';
+ 
+ describe('shouldKeepDeletedMessage', () => {
+   it('keeps an incoming participant deletion when the setting is on', () => {
+@@ -58,3 +61,35 @@ describe('shouldKeepDeletedMessage', () => {
+     );
+   });
+ });
++
++describe('shouldCompactDeletionRequestedPill', () => {
++  it('keeps the full label when the pill and reactions fit', () => {
++    assert.isFalse(
++      shouldCompactDeletionRequestedPill({
++        adjacentContentWidth: 60,
++        fullPillWidth: 120,
++        messageBubbleWidth: 200,
++      })
++    );
++  });
++
++  it('accounts for adjacent reactions when deciding to compact', () => {
++    assert.isTrue(
++      shouldCompactDeletionRequestedPill({
++        adjacentContentWidth: 80,
++        fullPillWidth: 120,
++        messageBubbleWidth: 190,
++      })
++    );
++  });
++
++  it('waits until the message bubble has been measured', () => {
++    assert.isFalse(
++      shouldCompactDeletionRequestedPill({
++        adjacentContentWidth: 80,
++        fullPillWidth: 120,
++        messageBubbleWidth: 0,
++      })
++    );
++  });
++});
+diff --git a/ts/test-node/util/vesperProtocol_test.std.ts b/ts/test-node/util/vesperProtocol_test.std.ts
+index 779e5ab3f..3423e7b92 100644
+--- a/ts/test-node/util/vesperProtocol_test.std.ts
++++ b/ts/test-node/util/vesperProtocol_test.std.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Signal Messenger, LLC
++// Copyright 2026 Vesper contributors
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import { assert } from 'chai';
+diff --git a/ts/types/StorageKeys.std.ts b/ts/types/StorageKeys.std.ts
+index 539adc6ee..da53449e3 100644
+--- a/ts/types/StorageKeys.std.ts
++++ b/ts/types/StorageKeys.std.ts
+@@ -9,6 +9,7 @@ import type {
+ import type { PhoneNumberDiscoverability } from '../util/phoneNumberDiscoverability.std.ts';
+ import type { RetryItemType } from '../services/retryPlaceholders.std.ts';
+ import type { ConfigMapType as RemoteConfigType } from '../RemoteConfig.dom.ts';
++import type { VesperConfigResponse } from '../VesperConfig.dom.ts';
+ import type { ExtendedStorageID, UnknownRecord } from './StorageService.d.ts';
+ 
+ import type { GroupCredentialType } from '../textsecure/WebAPI.preload.ts';
+@@ -159,6 +160,9 @@ export type StorageAccessType = {
+   'preferred-audio-output-device': AudioDevice | undefined;
+   remoteConfig: RemoteConfigType;
+   remoteConfigHash: string;
++  vesperConfig: VesperConfigResponse;
++  vesperConfigEtag: string;
++  vesperConfigLastFetchTime: number;
+   serverTimeSkew: number;
+   unidentifiedDeliveryIndicators: boolean;
+   groupCredentials: ReadonlyArray<GroupCredentialType>;
+@@ -489,6 +493,9 @@ const STORAGE_KEYS_TO_REMOVE_AFTER_UNLINK = [
+   'storage-service-pending-deletes',
+   'remoteConfig',
+   'remoteConfigHash',
++  'vesperConfig',
++  'vesperConfigEtag',
++  'vesperConfigLastFetchTime',
+   'serverTimeSkew',
+   'unidentifiedDeliveryIndicators',
+   'groupCredentials',
+diff --git a/ts/types/Stories.std.ts b/ts/types/Stories.std.ts
+index 65aaae1b7..18a135268 100644
+--- a/ts/types/Stories.std.ts
++++ b/ts/types/Stories.std.ts
+@@ -24,6 +24,7 @@ export type ReplyType = {
+     | 'isMe'
+     | 'name'
+     | 'profileName'
++    | 'serviceId'
+     | 'title'
+   >;
+   body?: string;
+diff --git a/ts/util/isVesperAuthor.std.ts b/ts/util/isVesperAuthor.std.ts
+index bf334fb41..cfc9c50d9 100644
+--- a/ts/util/isVesperAuthor.std.ts
++++ b/ts/util/isVesperAuthor.std.ts
+@@ -1,14 +1,13 @@
+-// Copyright 2026 Signal Messenger, LLC
++// Copyright 2026 Vesper contributors
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import type { ServiceIdString } from '../types/ServiceId.std.ts';
+-import { isAciString } from './isAciString.std.ts';
+-import { vesperAuthorACIs } from './vesperAuthorACIs.std.ts';
++import { isVesperDeveloper } from '../VesperConfig.dom.ts';
+ 
+ export function isVesperAuthor({
+   serviceId,
+ }: {
+   serviceId?: ServiceIdString | null;
+ }): boolean {
+-  return isAciString(serviceId) && vesperAuthorACIs.has(serviceId);
++  return isVesperDeveloper({ serviceId });
+ }
+diff --git a/ts/util/vesperDeleteForEveryone.std.ts b/ts/util/vesperDeleteForEveryone.std.ts
+index e6074a3f0..7d611b62f 100644
+--- a/ts/util/vesperDeleteForEveryone.std.ts
++++ b/ts/util/vesperDeleteForEveryone.std.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Signal Messenger, LLC
++// Copyright 2026 Vesper contributors
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ export function shouldKeepDeletedMessage({
+@@ -14,3 +14,18 @@ export function shouldKeepDeletedMessage({
+ }>): boolean {
+   return keepDeletedMessages && isIncoming && !isAdminDelete && !isStory;
+ }
++
++export function shouldCompactDeletionRequestedPill({
++  adjacentContentWidth,
++  fullPillWidth,
++  messageBubbleWidth,
++}: Readonly<{
++  adjacentContentWidth: number;
++  fullPillWidth: number;
++  messageBubbleWidth: number;
++}>): boolean {
++  return (
++    messageBubbleWidth > 0 &&
++    fullPillWidth + adjacentContentWidth >= messageBubbleWidth - 5
++  );
++}
+diff --git a/ts/util/vesperProtocol.std.ts b/ts/util/vesperProtocol.std.ts
+index 486a7d26c..7bfe161da 100644
+--- a/ts/util/vesperProtocol.std.ts
++++ b/ts/util/vesperProtocol.std.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Signal Messenger, LLC
++// Copyright 2026 Vesper contributors
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ const VESPER_PROTOCOL_SCHEME = 'vesper';

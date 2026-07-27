@@ -1,0 +1,444 @@
+From 46ca3659587a098c01e4e36df7972e00bf0039a3 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sun, 26 Jul 2026 19:32:04 +0100
+Subject: [PATCH 14/16] feat: add Vesper author verification badge
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ ts/components/StoryListItem.dom.tsx           |  4 ++-
+ .../conversation/ContactName.dom.tsx          | 18 ++++++++++---
+ .../conversation/ConversationHeader.dom.tsx   | 11 ++++++++
+ .../conversation/ConversationHero.dom.tsx     |  8 +++++-
+ ts/components/conversation/Message.dom.tsx    |  2 ++
+ .../ConversationDetailsHeader.dom.tsx         |  8 ++++++
+ .../conversationList/ContactListItem.dom.tsx  |  1 +
+ .../ConversationListItem.dom.tsx              |  1 +
+ ts/hooks/useMinimalConversation.std.ts        |  4 +++
+ ts/state/selectors/message.preload.ts         |  2 ++
+ ts/state/smart/ContactName.preload.tsx        |  1 +
+ ts/state/smart/HeroRow.preload.tsx            |  1 +
+ ts/test-node/util/isVesperAuthor_test.std.ts  | 26 +++++++++++++++++++
+ ts/util/isVesperAuthor.std.ts                 | 14 ++++++++++
+ 14 files changed, 96 insertions(+), 5 deletions(-)
+ create mode 100644 ts/test-node/util/isVesperAuthor_test.std.ts
+ create mode 100644 ts/util/isVesperAuthor.std.ts
+
+diff --git a/ts/components/StoryListItem.dom.tsx b/ts/components/StoryListItem.dom.tsx
+index 8f258af17..10808f9bf 100644
+--- a/ts/components/StoryListItem.dom.tsx
++++ b/ts/components/StoryListItem.dom.tsx
+@@ -21,6 +21,7 @@ import { StoryImage } from './StoryImage.dom.tsx';
+ import { getAvatarColor } from '../types/Colors.std.ts';
+ import { OfficialChatInlineBadge } from './conversation/OfficialChatInlineBadge.dom.tsx';
+ import { AxoConfirmDialog } from '../axo/AxoConfirmDialog.dom.tsx';
++import { isVesperAuthor } from '../util/isVesperAuthor.std.ts';
+ 
+ export type PropsType = Pick<ConversationStoryType, 'group' | 'isHidden'> & {
+   conversationId: string;
+@@ -98,6 +99,7 @@ export function StoryListItem({
+   const { firstName, title } = sender;
+ 
+   const isSignalOfficial = sender.serviceId === SIGNAL_ACI;
++  const showVesperAuthorBadge = isVesperAuthor(sender);
+ 
+   let avatarStoryRing: HasStories | undefined;
+   if (attachment) {
+@@ -173,7 +175,7 @@ export function StoryListItem({
+         <div className="StoryListItem__info">
+           <div className="StoryListItem__info--title">
+             {group ? group.title : title}
+-            {isSignalOfficial && (
++            {(isSignalOfficial || showVesperAuthorBadge) && (
+               <>
+                 &nbsp;
+                 <OfficialChatInlineBadge />
+diff --git a/ts/components/conversation/ContactName.dom.tsx b/ts/components/conversation/ContactName.dom.tsx
+index b499a5ea8..4d21e7f16 100644
+--- a/ts/components/conversation/ContactName.dom.tsx
++++ b/ts/components/conversation/ContactName.dom.tsx
+@@ -18,6 +18,8 @@ import type { FunStaticEmojiSize } from '../fun/FunEmoji.dom.tsx';
+ import { UserText } from '../UserText.dom.tsx';
+ import { OfficialChatInlineBadge } from './OfficialChatInlineBadge.dom.tsx';
+ import { Emoji } from '../../axo/emoji.std.ts';
++import type { ServiceIdString } from '../../types/ServiceId.std.ts';
++import { isVesperAuthor } from '../../util/isVesperAuthor.std.ts';
+ 
+ export type ContactNameData = {
+   contactNameColor?: ContactNameColorType;
+@@ -25,6 +27,7 @@ export type ContactNameData = {
+   firstName?: string;
+   isSignalConversation?: boolean;
+   isMe?: boolean;
++  serviceId?: ServiceIdString;
+   title: string;
+ };
+ 
+@@ -32,7 +35,7 @@ export function useContactNameData(
+   conversation: ConversationType | null,
+   contactNameColor?: ContactNameColorType
+ ): ContactNameData | null {
+-  const { firstName, title, isMe } = conversation ?? {};
++  const { firstName, title, isMe, serviceId } = conversation ?? {};
+   const isSignalConversation =
+     conversation != null ? getIsSignalConversation(conversation) : null;
+   return useMemo(() => {
+@@ -44,9 +47,17 @@ export function useContactNameData(
+       firstName,
+       isSignalConversation,
+       isMe,
++      serviceId,
+       title,
+     };
+-  }, [contactNameColor, firstName, isSignalConversation, isMe, title]);
++  }, [
++    contactNameColor,
++    firstName,
++    isSignalConversation,
++    isMe,
++    serviceId,
++    title,
++  ]);
+ }
+ 
+ export type PropsType = ContactNameData & {
+@@ -62,6 +73,7 @@ export function ContactName({
+   firstName,
+   isSignalConversation,
+   isMe,
++  serviceId,
+   module,
+   preferFirstName,
+   title,
+@@ -93,7 +105,7 @@ export function ContactName({
+     >
+       <UserText text={text} />
+ 
+-      {(isSignalConversation || isMe) && (
++      {(isSignalConversation || isMe || isVesperAuthor({ serviceId })) && (
+         <>
+           &nbsp;
+           <OfficialChatInlineBadge />
+diff --git a/ts/components/conversation/ConversationHeader.dom.tsx b/ts/components/conversation/ConversationHeader.dom.tsx
+index 1dc738ea9..b393dfbcc 100644
+--- a/ts/components/conversation/ConversationHeader.dom.tsx
++++ b/ts/components/conversation/ConversationHeader.dom.tsx
+@@ -53,6 +53,7 @@ import { OfficialChatInlineBadge } from './OfficialChatInlineBadge.dom.tsx';
+ import { AxoIconButton } from '../../axo/AxoIconButton.dom.tsx';
+ import { AxoButton } from '../../axo/AxoButton.dom.tsx';
+ import { AxoConfirmDialog } from '../../axo/AxoConfirmDialog.dom.tsx';
++import { isVesperAuthor } from '../../util/isVesperAuthor.std.ts';
+ 
+ function HeaderInfoTitle({
+   name,
+@@ -61,6 +62,7 @@ function HeaderInfoTitle({
+   i18n,
+   isMe,
+   isSignalConversation,
++  showVesperAuthorBadge,
+   headerRef,
+ }: {
+   name: string | null;
+@@ -69,6 +71,7 @@ function HeaderInfoTitle({
+   i18n: LocalizerType;
+   isMe: boolean;
+   isSignalConversation: boolean;
++  showVesperAuthorBadge: boolean;
+   headerRef: RefObject<HTMLDivElement | null>;
+ }) {
+   if (isSignalConversation) {
+@@ -94,6 +97,12 @@ function HeaderInfoTitle({
+   return (
+     <div className="module-ConversationHeader__header__info__title">
+       <UserText text={title} />
++      {showVesperAuthorBadge ? (
++        <>
++          &nbsp;
++          <OfficialChatInlineBadge />
++        </>
++      ) : null}
+       {isInSystemContacts({ name: name ?? undefined, type }) ? (
+         <InContactsIcon
+           className="module-ConversationHeader__header__info__title__in-contacts-icon"
+@@ -540,6 +549,7 @@ function HeaderContent({
+   );
+ 
+   const isOfficialChat = isSignalConversation || conversation.isMe;
++  const showVesperAuthorBadge = isVesperAuthor(conversation);
+ 
+   const contents = (
+     <div className="module-ConversationHeader__header__info">
+@@ -550,6 +560,7 @@ function HeaderContent({
+         i18n={i18n}
+         isMe={conversation.isMe}
+         isSignalConversation={isSignalConversation}
++        showVesperAuthorBadge={showVesperAuthorBadge}
+         headerRef={headerRef}
+       />
+       {(isOfficialChat ||
+diff --git a/ts/components/conversation/ConversationHero.dom.tsx b/ts/components/conversation/ConversationHero.dom.tsx
+index 69e8ba73d..4be099fe7 100644
+--- a/ts/components/conversation/ConversationHero.dom.tsx
++++ b/ts/components/conversation/ConversationHero.dom.tsx
+@@ -18,6 +18,7 @@ import type { ContactModalStateType } from '../../types/globalModals.std.ts';
+ import { type TailwindStyles, tw } from '../../axo/tw.dom.tsx';
+ import { AxoSymbol } from '../../axo/AxoSymbol.dom.tsx';
+ import { AxoButton } from '../../axo/AxoButton.dom.tsx';
++import type { ServiceIdString } from '../../types/ServiceId.std.ts';
+ 
+ export type Props = {
+   about?: string;
+@@ -38,6 +39,7 @@ export type Props = {
+   memberships: ReadonlyArray<GroupV2Membership>;
+   openConversationDetails?: () => unknown;
+   pendingAvatarDownload?: boolean;
++  serviceId?: ServiceIdString;
+   sharedGroupNames?: ReadonlyArray<string>;
+   startAvatarDownload: () => void;
+   theme: ThemeType;
+@@ -73,6 +75,7 @@ export function ConversationHero({
+   memberships,
+   pendingAvatarDownload,
+   profileName,
++  serviceId,
+   sharedGroupNames = [],
+   startAvatarDownload,
+   theme,
+@@ -172,6 +175,7 @@ export function ConversationHero({
+         {avatar}
+         <Title
+           title={title}
++          serviceId={serviceId}
+           onClick={() => toggleAboutContactModal({ contactId: id })}
+         />
+ 
+@@ -284,18 +288,20 @@ const ConversationAvatar: FC<DistributiveOmit<AvatarProps, 'size'>> = props => {
+ type TitleProps = {
+   isMe?: boolean;
+   isSignalConversation?: boolean;
++  serviceId?: ServiceIdString;
+   title: string;
+   onClick?: () => void;
+ };
+ 
+ const Title: FC<TitleProps> = props => {
+   const className = tw('mt-3 text-center text-[20px] leading-6 font-medium');
+-  const { onClick, title, isMe, isSignalConversation } = props;
++  const { onClick, title, isMe, isSignalConversation, serviceId } = props;
+   const contactName = (
+     <ContactName
+       title={title}
+       isMe={isMe}
+       isSignalConversation={isSignalConversation}
++      serviceId={serviceId}
+     />
+   );
+ 
+diff --git a/ts/components/conversation/Message.dom.tsx b/ts/components/conversation/Message.dom.tsx
+index 948b7f47d..e4f2cd4e8 100644
+--- a/ts/components/conversation/Message.dom.tsx
++++ b/ts/components/conversation/Message.dom.tsx
+@@ -258,6 +258,7 @@ export type PropsData = {
+     | 'isMe'
+     | 'phoneNumber'
+     | 'profileName'
++    | 'serviceId'
+     | 'title'
+   >;
+   conversationType: ConversationTypeType;
+@@ -1199,6 +1200,7 @@ export class Message extends PureComponent<Props, State> {
+         <ContactName
+           contactNameColor={contactNameColor}
+           contactLabel={contactLabel}
++          serviceId={author.serviceId}
+           title={author.isMe ? i18n('icu:you') : author.title}
+           module={moduleName}
+         />
+diff --git a/ts/components/conversation/conversation-details/ConversationDetailsHeader.dom.tsx b/ts/components/conversation/conversation-details/ConversationDetailsHeader.dom.tsx
+index d9457f893..451e88ca3 100644
+--- a/ts/components/conversation/conversation-details/ConversationDetailsHeader.dom.tsx
++++ b/ts/components/conversation/conversation-details/ConversationDetailsHeader.dom.tsx
+@@ -20,6 +20,7 @@ import type { ContactModalStateType } from '../../../types/globalModals.std.ts';
+ import { tw } from '../../../axo/tw.dom.tsx';
+ import { AxoSymbol } from '../../../axo/AxoSymbol.dom.tsx';
+ import { OfficialChatInlineBadge } from '../OfficialChatInlineBadge.dom.tsx';
++import { isVesperAuthor } from '../../../util/isVesperAuthor.std.ts';
+ 
+ export type Props = {
+   areWeASubscriber: boolean;
+@@ -64,6 +65,7 @@ export function ConversationDetailsHeader({
+   const [activeModal, setActiveModal] = useState<
+     undefined | ConversationDetailsHeaderActiveModal
+   >();
++  const showVesperAuthorBadge = isVesperAuthor(conversation);
+ 
+   let preferredBadge: undefined | BadgeType;
+   let subtitle: ReactNode;
+@@ -255,6 +257,12 @@ export function ConversationDetailsHeader({
+       >
+         <div className="ConversationDetailsHeader__title">
+           <UserText text={conversation.title} />
++          {showVesperAuthorBadge ? (
++            <>
++              &nbsp;
++              <OfficialChatInlineBadge />
++            </>
++          ) : null}
+           {isInSystemContacts(conversation) && (
+             <span>
+               {' '}
+diff --git a/ts/components/conversationList/ContactListItem.dom.tsx b/ts/components/conversationList/ContactListItem.dom.tsx
+index 8ddd9d7a0..dbca79a42 100644
+--- a/ts/components/conversationList/ContactListItem.dom.tsx
++++ b/ts/components/conversationList/ContactListItem.dom.tsx
+@@ -147,6 +147,7 @@ export const ContactListItem: FunctionComponent<PropsType> = memo(
+       <ContactName
+         isSignalConversation={isSignalConversation({ id, serviceId })}
+         module={HEADER_CONTACT_NAME_CLASS_NAME}
++        serviceId={serviceId}
+         title={title}
+       />
+     );
+diff --git a/ts/components/conversationList/ConversationListItem.dom.tsx b/ts/components/conversationList/ConversationListItem.dom.tsx
+index 34b071324..12d5db33b 100644
+--- a/ts/components/conversationList/ConversationListItem.dom.tsx
++++ b/ts/components/conversationList/ConversationListItem.dom.tsx
+@@ -124,6 +124,7 @@ export const ConversationListItem: FunctionComponent<Props> = memo(
+           <ContactName
+             module={HEADER_CONTACT_NAME_CLASS_NAME}
+             isSignalConversation={isSignalConversation({ id, serviceId })}
++            serviceId={serviceId}
+             title={title}
+           />
+         )}
+diff --git a/ts/hooks/useMinimalConversation.std.ts b/ts/hooks/useMinimalConversation.std.ts
+index db5b6e912..f393fcbce 100644
+--- a/ts/hooks/useMinimalConversation.std.ts
++++ b/ts/hooks/useMinimalConversation.std.ts
+@@ -42,6 +42,7 @@ export type MinimalConversation = Satisfies<
+     | 'name'
+     | 'phoneNumber'
+     | 'profileName'
++    | 'serviceId'
+     | 'terminated'
+     | 'title'
+     | 'type'
+@@ -77,6 +78,7 @@ export function useMinimalConversation(
+     name,
+     phoneNumber,
+     profileName,
++    serviceId,
+     terminated,
+     title,
+     type,
+@@ -109,6 +111,7 @@ export function useMinimalConversation(
+       name,
+       phoneNumber,
+       profileName,
++      serviceId,
+       terminated,
+       title,
+       type,
+@@ -138,6 +141,7 @@ export function useMinimalConversation(
+     name,
+     phoneNumber,
+     profileName,
++    serviceId,
+     terminated,
+     title,
+     type,
+diff --git a/ts/state/selectors/message.preload.ts b/ts/state/selectors/message.preload.ts
+index 796b2c432..f1b9e4ae7 100644
+--- a/ts/state/selectors/message.preload.ts
++++ b/ts/state/selectors/message.preload.ts
+@@ -386,6 +386,7 @@ const getAuthorForMessage = (
+     name,
+     phoneNumber,
+     profileName,
++    serviceId,
+     title,
+   } = getContact(message, options);
+ 
+@@ -402,6 +403,7 @@ const getAuthorForMessage = (
+     name,
+     phoneNumber,
+     profileName,
++    serviceId,
+     title,
+   };
+ 
+diff --git a/ts/state/smart/ContactName.preload.tsx b/ts/state/smart/ContactName.preload.tsx
+index 698b662c1..5c6660f26 100644
+--- a/ts/state/smart/ContactName.preload.tsx
++++ b/ts/state/smart/ContactName.preload.tsx
+@@ -32,6 +32,7 @@ export const SmartContactName = memo(function SmartContactName({
+   return (
+     <ContactName
+       firstName={contact.firstName}
++      serviceId={contact.serviceId}
+       title={contact.title ?? i18n('icu:unknownContact')}
+       onClick={handleClick}
+     />
+diff --git a/ts/state/smart/HeroRow.preload.tsx b/ts/state/smart/HeroRow.preload.tsx
+index 1633def90..ab99d16f4 100644
+--- a/ts/state/smart/HeroRow.preload.tsx
++++ b/ts/state/smart/HeroRow.preload.tsx
+@@ -119,6 +119,7 @@ export const SmartHeroRow = memo(function SmartHeroRow({
+         openConversationDetails={openConversationDetails}
+         pendingAvatarDownload={isPendingAvatarDownload(id)}
+         profileName={profileName}
++        serviceId={conversation.serviceId}
+         sharedGroupNames={sharedGroupNames}
+         startAvatarDownload={() => startAvatarDownload(id)}
+         theme={theme}
+diff --git a/ts/test-node/util/isVesperAuthor_test.std.ts b/ts/test-node/util/isVesperAuthor_test.std.ts
+new file mode 100644
+index 000000000..78574c19c
+--- /dev/null
++++ b/ts/test-node/util/isVesperAuthor_test.std.ts
+@@ -0,0 +1,26 @@
++// Copyright 2026 Signal Messenger, LLC
++// SPDX-License-Identifier: AGPL-3.0-only
++
++import { assert } from 'chai';
++
++import {
++  generateAci,
++  generatePni,
++} from '../../test-helpers/serviceIdUtils.std.ts';
++import { isVesperAuthor } from '../../util/isVesperAuthor.std.ts';
++import { vesperAuthorACIs } from '../../util/vesperAuthorACIs.std.ts';
++
++describe('isVesperAuthor', () => {
++  it('returns true for configured author ACIs', () => {
++    assert.isNotEmpty(vesperAuthorACIs);
++    vesperAuthorACIs.forEach(serviceId => {
++      assert.isTrue(isVesperAuthor({ serviceId }));
++    });
++  });
++
++  it('returns false for other identifiers', () => {
++    assert.isFalse(isVesperAuthor({ serviceId: generateAci() }));
++    assert.isFalse(isVesperAuthor({ serviceId: generatePni() }));
++    assert.isFalse(isVesperAuthor({ serviceId: undefined }));
++  });
++});
+diff --git a/ts/util/isVesperAuthor.std.ts b/ts/util/isVesperAuthor.std.ts
+new file mode 100644
+index 000000000..bf334fb41
+--- /dev/null
++++ b/ts/util/isVesperAuthor.std.ts
+@@ -0,0 +1,14 @@
++// Copyright 2026 Signal Messenger, LLC
++// SPDX-License-Identifier: AGPL-3.0-only
++
++import type { ServiceIdString } from '../types/ServiceId.std.ts';
++import { isAciString } from './isAciString.std.ts';
++import { vesperAuthorACIs } from './vesperAuthorACIs.std.ts';
++
++export function isVesperAuthor({
++  serviceId,
++}: {
++  serviceId?: ServiceIdString | null;
++}): boolean {
++  return isAciString(serviceId) && vesperAuthorACIs.has(serviceId);
++}

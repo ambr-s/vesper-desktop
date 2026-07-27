@@ -96,6 +96,8 @@ LANG=en-us \
     --file ts/test-node/setup.preload.ts \
     ts/test-node/app/menu_test.node.ts \
     ts/test-node/app/renderWindowsToast_test.std.tsx \
+    ts/test-node/VesperConfig_test.dom.ts \
+    ts/test-node/util/isVesperAuthor_test.dom.ts \
     ts/test-node/util/vesperDeleteForEveryone_test.std.ts \
     ts/test-node/util/vesperProtocol_test.std.ts
 
@@ -109,11 +111,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Building the Linux x64 Debian package..."
+echo "Building the Linux x64 Debian and AppImage packages..."
 DISABLE_INSPECT_FUSE=on \
-  pnpm run build:release --linux deb --x64 --publish=never
+  pnpm run build:release --linux deb AppImage --x64 --publish=never
 
-mapfile -t PACKAGES < <(
+mapfile -t DEBIAN_PACKAGES < <(
   find release \
     -maxdepth 1 \
     -type f \
@@ -123,13 +125,30 @@ mapfile -t PACKAGES < <(
     sort
 )
 
-if ((${#PACKAGES[@]} != 1)); then
-  printf 'Expected one new Debian package, found %s:\n' "${#PACKAGES[@]}" >&2
+mapfile -t APPIMAGE_PACKAGES < <(
+  find release \
+    -maxdepth 1 \
+    -type f \
+    -name '*.AppImage' \
+    -newer "$BUILD_MARKER" \
+    -print |
+    sort
+)
+
+if ((${#DEBIAN_PACKAGES[@]} != 1)); then
+  printf 'Expected one new Debian package, found %s:\n' \
+    "${#DEBIAN_PACKAGES[@]}" >&2
+  find release -maxdepth 1 -type f -printf '  %p\n' | sort >&2
+  exit 1
+fi
+if ((${#APPIMAGE_PACKAGES[@]} != 1)); then
+  printf 'Expected one new AppImage package, found %s:\n' \
+    "${#APPIMAGE_PACKAGES[@]}" >&2
   find release -maxdepth 1 -type f -printf '  %p\n' | sort >&2
   exit 1
 fi
 
 echo
 echo "Local build completed:"
-printf '  %s\n' "${PACKAGES[0]}"
-sha256sum "${PACKAGES[0]}"
+printf '  %s\n' "${DEBIAN_PACKAGES[0]}" "${APPIMAGE_PACKAGES[0]}"
+sha256sum "${DEBIAN_PACKAGES[0]}" "${APPIMAGE_PACKAGES[0]}"

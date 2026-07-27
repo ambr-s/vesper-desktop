@@ -1,15 +1,16 @@
-From 7d6c00258b11877c461e42e2ad61d23a7cb97b22 Mon Sep 17 00:00:00 2001
+From 4c1db3ba8bc84655fc6263fa96939e83e426d741 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 21:09:12 +0100
-Subject: [PATCH 10/12] Update Electron to 43.2.0
+Subject: [PATCH 10/16] Update Electron to 43.2.0
 
+Signed-off-by: amber <amber@flourish.ch>
 ---
  package.json   |   2 +-
  pnpm-lock.yaml | 390 ++++++++++++++++++++++++-------------------------
  2 files changed, 196 insertions(+), 196 deletions(-)
 
 diff --git a/package.json b/package.json
-index b56493f0f..8aa5ac6cc 100644
+index 34ccb3c7c..38156a1cd 100644
 --- a/package.json
 +++ b/package.json
 @@ -237,7 +237,7 @@

@@ -1,8 +1,9 @@
-From c90a41686abfe6bdb6140c9ab18ae318a092412d Mon Sep 17 00:00:00 2001
+From 34765f4f18c2e33cc34fba30280cd22886a7970b Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 22:45:49 +0100
-Subject: [PATCH 11/12] Require encrypted database key storage
+Subject: [PATCH 11/16] Require encrypted database key storage
 
+Signed-off-by: amber <amber@flourish.ch>
 ---
  app/main.main.ts | 71 +++++++++++-------------------------------------
  1 file changed, 16 insertions(+), 55 deletions(-)

@@ -1,9 +1,11 @@
-From d4852d419c8c648ddb0db32708f9a5de193bbf91 Mon Sep 17 00:00:00 2001
+From 8d080f7fd9d4a49b5e3d17a17b0583ff9644e520 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 19:18:41 +0100
-Subject: [PATCH 06/12] Isolate development protocol handlers
+Subject: [PATCH 06/16] Isolate development protocol handlers
 
 Select production or development Vesper schemes from package identity and accept either scheme at the application boundary. Development builds no longer claim production Vesper handlers.
+
+Signed-off-by: amber <amber@flourish.ch>
 ---
  app/main.main.ts                             | 26 +++++++++------
  app/renderWindowsToast.std.tsx               | 16 +++++++--
