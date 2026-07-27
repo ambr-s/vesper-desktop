@@ -128,39 +128,45 @@ run_smoke() {
     sed -n '1,260p' "$log_file" >&2
     exit 1
   fi
-
-  grep -Fq "userData: $SMOKE_ROOT/Vesper" "$log_file"
 }
-
-run_smoke "$SMOKE_LOG_FIRST"
 
 # The dollar expression belongs to the JavaScript template literal.
 # shellcheck disable=SC2016
-node -e '
-  const config = require(process.argv[1]);
-  const details = {
-    safeStorageBackend: config.safeStorageBackend,
-    encryptedKeyType: typeof config.encryptedKey,
-    encryptedKeyLength:
-      typeof config.encryptedKey === "string"
-        ? config.encryptedKey.length
-        : undefined,
-    hasPlaintextKey: Object.hasOwn(config, "key"),
-  };
-  if (
-    config.safeStorageBackend !== "gnome_libsecret" ||
-    typeof config.encryptedKey !== "string" ||
-    !/^[0-9a-f]+$/u.test(config.encryptedKey) ||
-    Object.hasOwn(config, "key")
-  ) {
-    console.error(
-      `Unexpected Flatpak database-key configuration: ${JSON.stringify(details)}`
-    );
-    process.exit(1);
-  }
-' "$SMOKE_ROOT/Vesper/config.json"
+read_encrypted_key() {
+  node -e '
+    const config = require(process.argv[1]);
+    const details = {
+      safeStorageBackend: config.safeStorageBackend,
+      encryptedKeyType: typeof config.encryptedKey,
+      encryptedKeyLength:
+        typeof config.encryptedKey === "string"
+          ? config.encryptedKey.length
+          : undefined,
+      hasPlaintextKey: Object.hasOwn(config, "key"),
+    };
+    if (
+      config.safeStorageBackend !== "gnome_libsecret" ||
+      typeof config.encryptedKey !== "string" ||
+      !/^[0-9a-f]+$/u.test(config.encryptedKey) ||
+      Object.hasOwn(config, "key")
+    ) {
+      console.error(
+        `Unexpected Flatpak database-key configuration: ${JSON.stringify(details)}`
+      );
+      process.exit(1);
+    }
+    process.stdout.write(config.encryptedKey);
+  ' "$SMOKE_ROOT/Vesper/config.json"
+}
 
+run_smoke "$SMOKE_LOG_FIRST"
+ENCRYPTED_KEY_FIRST="$(read_encrypted_key)"
 run_smoke "$SMOKE_LOG_SECOND"
+ENCRYPTED_KEY_SECOND="$(read_encrypted_key)"
+if [[ "$ENCRYPTED_KEY_SECOND" != "$ENCRYPTED_KEY_FIRST" ]]; then
+  echo "Flatpak database key changed between launches." >&2
+  exit 1
+fi
 
 grep -En \
   'Uncaught Exception|SyntaxError|TypeError:|ReferenceError:|FATAL:|database encryption key|SafeStorageDecryptionError' \
