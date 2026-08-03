@@ -1,4 +1,4 @@
-From e0ef9f463d8ff32bcfa77a26131269e59569da36 Mon Sep 17 00:00:00 2001
+From 6c14a6adeffec5a7b9ce30a853a82734aa1ed123 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 19:28:50 +0100
 Subject: [PATCH 07/16] Record Molly provenance in adapted settings

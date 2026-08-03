@@ -1,4 +1,4 @@
-From 4c7bdfa31c6be5616bfe6617bc278611e5b2c98d Mon Sep 17 00:00:00 2001
+From b9afe3d2946bbfc8ca263556b193485a66992a6e Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:59:37 +0100
 Subject: [PATCH 04/16] Add Vesper help and internal settings surfaces
@@ -20,7 +20,7 @@ Signed-off-by: amber <amber@flourish.ch>
  8 files changed, 95 insertions(+), 29 deletions(-)
 
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index 040675681..f3713a038 100644
+index 62ec0cdd4..b2d71f822 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
 @@ -123,6 +123,30 @@
@@ -54,7 +54,7 @@ index 040675681..f3713a038 100644
    "icu:copyErrorAndQuit": {
      "messageformat": "Copy error and quit",
      "description": "Shown in the top-level error popup, allowing user to copy the error text and close the app"
-@@ -8896,6 +8920,10 @@
+@@ -8900,6 +8924,10 @@
      "messageformat": "Vesper",
      "description": "Title of the Vesper section in Settings > Privacy"
    },

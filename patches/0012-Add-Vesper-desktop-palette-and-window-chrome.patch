@@ -1,4 +1,4 @@
-From 5e9343f420cf0dbb6673ecaa6b1ecdaa41c9b6ab Mon Sep 17 00:00:00 2001
+From d8e0880a7a34659c1d2247ac47f0cb18d1b8c5cf Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sun, 26 Jul 2026 13:53:39 +0100
 Subject: [PATCH 12/16] Add Vesper desktop palette and window chrome
@@ -46,7 +46,7 @@ Signed-off-by: amber <amber@flourish.ch>
  create mode 100644 ts/components/VesperTitleBar.dom.tsx
 
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index f3713a038..ee70fc3a1 100644
+index b2d71f822..907057545 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
 @@ -311,6 +311,14 @@
@@ -64,7 +64,7 @@ index f3713a038..ee70fc3a1 100644
    "icu:windowMenuZoom": {
      "messageformat": "Zoom",
      "description": "Window menu command to make the current window the size of the whole screen"
-@@ -2453,6 +2461,18 @@
+@@ -2457,6 +2465,18 @@
      "messageformat": "Theme",
      "description": "Header for theme settings"
    },
@@ -346,7 +346,7 @@ index 80ae300e7..bd8ec646c 100644
        project: [
          // Production
 diff --git a/stylesheets/_mixins.scss b/stylesheets/_mixins.scss
-index 8aaac09f4..95cdd2422 100644
+index 55ee7f873..5aa78d819 100644
 --- a/stylesheets/_mixins.scss
 +++ b/stylesheets/_mixins.scss
 @@ -441,18 +441,18 @@ $rtl-icon-map: (
@@ -426,7 +426,7 @@ index 8aaac09f4..95cdd2422 100644
      }
    }
 diff --git a/stylesheets/_modules.scss b/stylesheets/_modules.scss
-index a621fe672..3a8539ad4 100644
+index a1801087c..98a60b17a 100644
 --- a/stylesheets/_modules.scss
 +++ b/stylesheets/_modules.scss
 @@ -388,7 +388,7 @@ $message-padding-horizontal: 12px;
@@ -438,7 +438,7 @@ index a621fe672..3a8539ad4 100644
  }
  
  .module-message__select-checkbox {
-@@ -6384,7 +6384,7 @@ button.module-calling-participants-list__contact {
+@@ -6359,7 +6359,7 @@ button.module-calling-participants-list__contact {
  }
  .module-message__action--incoming--in-another-call {
    @include mixins.light-theme {

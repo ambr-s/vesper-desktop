@@ -1,4 +1,4 @@
-From 813578a045cbe48da69e50c8900d701a101027a6 Mon Sep 17 00:00:00 2001
+From 10fa727defdaf40b4f35f80ed7c5b79871209bd9 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:49:16 +0100
 Subject: [PATCH 02/16] Add opt-in diagnostic logging
@@ -28,10 +28,10 @@ Signed-off-by: amber <amber@flourish.ch>
  16 files changed, 187 insertions(+), 6 deletions(-)
 
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index 542984e03..c3230a8cc 100644
+index 5e9ec1828..be46714e4 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
-@@ -8892,6 +8892,30 @@
+@@ -8896,6 +8896,30 @@
      "messageformat": "Disable",
      "description": "Text of the button confirm disabling screen security modal in Settings > Privacy > Application"
    },

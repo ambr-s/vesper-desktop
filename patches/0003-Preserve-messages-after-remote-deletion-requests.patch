@@ -1,4 +1,4 @@
-From 4353c1a9c0486d449d07bbe5c79cfbdcb25eed25 Mon Sep 17 00:00:00 2001
+From d21a64409f5c884a45e53bf2065d38d03ad372e8 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:54:15 +0100
 Subject: [PATCH 03/16] Preserve messages after remote deletion requests
@@ -48,10 +48,10 @@ index e61ad55f4..f7a33a7f6 100644
  
  export const enforceLicenseComments = ESLintUtils.RuleCreator.withoutDocs({
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index c3230a8cc..040675681 100644
+index be46714e4..62ec0cdd4 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
-@@ -8916,6 +8916,30 @@
+@@ -8920,6 +8920,30 @@
      "messageformat": "Turn off and delete",
      "description": "Action in the diagnostic logging disable confirmation"
    },
@@ -83,24 +83,22 @@ index c3230a8cc..040675681 100644
      "messageformat": "Update to version {version} available",
      "description": "Tooltip for new update available"
 diff --git a/stylesheets/_modules.scss b/stylesheets/_modules.scss
-index 6130993c2..a621fe672 100644
+index bf5bb8b81..a1801087c 100644
 --- a/stylesheets/_modules.scss
 +++ b/stylesheets/_modules.scss
-@@ -1706,8 +1706,13 @@ $message-padding-horizontal: 12px;
+@@ -1693,6 +1693,11 @@ $message-padding-horizontal: 12px;
    z-index: variables.$z-index-above-base;
    height: 22px;
    display: flex;
 +  align-items: center;
-   user-select: none;
- 
++
 +  &--with-deletion-requested {
 +    height: 26px;
 +  }
-+
+ 
    &--incoming {
      align-self: flex-end;
-     padding-inline-end: 8px;
-@@ -1720,6 +1725,29 @@ $message-padding-horizontal: 12px;
+@@ -1706,6 +1711,29 @@ $message-padding-horizontal: 12px;
    }
  }
  
@@ -538,7 +536,7 @@ index e90ad8d11..b32787843 100644
    expirationStartTimestamp?: number | null;
    expireTimer?: DurationInSeconds;
 diff --git a/ts/state/selectors/message.preload.ts b/ts/state/selectors/message.preload.ts
-index f51e139af..796b2c432 100644
+index 3043d9bc9..7ff7a3125 100644
 --- a/ts/state/selectors/message.preload.ts
 +++ b/ts/state/selectors/message.preload.ts
 @@ -1001,6 +1001,7 @@ const getPropsForMessage = (

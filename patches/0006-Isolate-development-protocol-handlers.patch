@@ -1,4 +1,4 @@
-From 8d080f7fd9d4a49b5e3d17a17b0583ff9644e520 Mon Sep 17 00:00:00 2001
+From 58e5360ac0cc779f1a765fd11c2ec6f7b493e8e9 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 19:18:41 +0100
 Subject: [PATCH 06/16] Isolate development protocol handlers

@@ -1,4 +1,4 @@
-From 46ca3659587a098c01e4e36df7972e00bf0039a3 Mon Sep 17 00:00:00 2001
+From e1fd02c7dfa4c16a72e3ac76dbcf95e1ec0aa39d Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sun, 26 Jul 2026 19:32:04 +0100
 Subject: [PATCH 14/16] feat: add Vesper author verification badge
@@ -119,7 +119,7 @@ index b499a5ea8..4d21e7f16 100644
            &nbsp;
            <OfficialChatInlineBadge />
 diff --git a/ts/components/conversation/ConversationHeader.dom.tsx b/ts/components/conversation/ConversationHeader.dom.tsx
-index 1dc738ea9..b393dfbcc 100644
+index d6c04002e..cdd9c80dd 100644
 --- a/ts/components/conversation/ConversationHeader.dom.tsx
 +++ b/ts/components/conversation/ConversationHeader.dom.tsx
 @@ -53,6 +53,7 @@ import { OfficialChatInlineBadge } from './OfficialChatInlineBadge.dom.tsx';
@@ -159,7 +159,7 @@ index 1dc738ea9..b393dfbcc 100644
        {isInSystemContacts({ name: name ?? undefined, type }) ? (
          <InContactsIcon
            className="module-ConversationHeader__header__info__title__in-contacts-icon"
-@@ -540,6 +549,7 @@ function HeaderContent({
+@@ -543,6 +552,7 @@ function HeaderContent({
    );
  
    const isOfficialChat = isSignalConversation || conversation.isMe;
@@ -167,7 +167,7 @@ index 1dc738ea9..b393dfbcc 100644
  
    const contents = (
      <div className="module-ConversationHeader__header__info">
-@@ -550,6 +560,7 @@ function HeaderContent({
+@@ -553,6 +563,7 @@ function HeaderContent({
          i18n={i18n}
          isMe={conversation.isMe}
          isSignalConversation={isSignalConversation}
@@ -347,7 +347,7 @@ index db5b6e912..f393fcbce 100644
      title,
      type,
 diff --git a/ts/state/selectors/message.preload.ts b/ts/state/selectors/message.preload.ts
-index 796b2c432..f1b9e4ae7 100644
+index 7ff7a3125..1fe635020 100644
 --- a/ts/state/selectors/message.preload.ts
 +++ b/ts/state/selectors/message.preload.ts
 @@ -386,6 +386,7 @@ const getAuthorForMessage = (
