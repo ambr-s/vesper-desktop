@@ -1,4 +1,4 @@
-From d8e0880a7a34659c1d2247ac47f0cb18d1b8c5cf Mon Sep 17 00:00:00 2001
+From 95cb919c7bbb3c4a4b93d15998c4e2bfa539dabe Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sun, 26 Jul 2026 13:53:39 +0100
 Subject: [PATCH 12/16] Add Vesper desktop palette and window chrome
@@ -46,10 +46,10 @@ Signed-off-by: amber <amber@flourish.ch>
  create mode 100644 ts/components/VesperTitleBar.dom.tsx
 
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index b2d71f822..907057545 100644
+index 90491effd..2b1f9f382 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
-@@ -311,6 +311,14 @@
+@@ -315,6 +315,14 @@
      "messageformat": "Minimize",
      "description": "Window menu command to minimize the current window"
    },
@@ -64,7 +64,7 @@ index b2d71f822..907057545 100644
    "icu:windowMenuZoom": {
      "messageformat": "Zoom",
      "description": "Window menu command to make the current window the size of the whole screen"
-@@ -2457,6 +2465,18 @@
+@@ -2461,6 +2469,18 @@
      "messageformat": "Theme",
      "description": "Header for theme settings"
    },
@@ -84,10 +84,10 @@ index b2d71f822..907057545 100644
      "messageformat": "Calling",
      "description": "Header for calling options on the settings screen"
 diff --git a/app/main.main.ts b/app/main.main.ts
-index 17e47e92a..4f386f0f5 100644
+index 86774417b..e3c8f06ed 100644
 --- a/app/main.main.ts
 +++ b/app/main.main.ts
-@@ -380,20 +380,33 @@ type GetBackgroundColorOptionsType = GetThemeSettingOptionsType &
+@@ -374,20 +374,33 @@ type GetBackgroundColorOptionsType = GetThemeSettingOptionsType &
  const AXO_COLOR_BRAND_LOGO = '#7152ff';
  const AXO_COLOR_SURFACE_PRIMARY_LIGHT = '#f6f6ff';
  const AXO_COLOR_SURFACE_PRIMARY_DARK = '#100e1f';
@@ -124,7 +124,7 @@ index 17e47e92a..4f386f0f5 100644
    }
  
    throw missingCaseError(theme);
-@@ -459,6 +472,8 @@ if (windowConfigParsed.success) {
+@@ -453,6 +466,8 @@ if (windowConfigParsed.success) {
    windowConfig = windowConfigParsed.data;
  }
  
@@ -133,7 +133,7 @@ index 17e47e92a..4f386f0f5 100644
  if (windowFromUserConfig) {
    userConfig.set('window', null);
    ephemeralConfig.set('window', windowConfig);
-@@ -652,10 +667,8 @@ if (OS.isWindows()) {
+@@ -646,10 +661,8 @@ if (OS.isWindows()) {
    windowIcon = join(rootDir, 'build', 'icons', 'png', '512x512.png');
  }
  
@@ -146,7 +146,7 @@ index 17e47e92a..4f386f0f5 100644
  const mainTitleBarStyle = OS.isMacOS()
    ? ('hidden' as const)
    : ('default' as const);
-@@ -726,8 +739,8 @@ async function createWindow() {
+@@ -720,8 +733,8 @@ async function createWindow() {
      height,
      minWidth: MIN_WIDTH,
      minHeight: MIN_HEIGHT,
@@ -157,7 +157,7 @@ index 17e47e92a..4f386f0f5 100644
      backgroundColor,
      webPreferences: {
        ...defaultWebPrefs,
-@@ -741,7 +754,7 @@ async function createWindow() {
+@@ -735,7 +748,7 @@ async function createWindow() {
        spellcheck,
      },
      icon: windowIcon,
@@ -166,7 +166,7 @@ index 17e47e92a..4f386f0f5 100644
    };
  
    if (!isNumber(windowOptions.width) || windowOptions.width < MIN_WIDTH) {
-@@ -828,7 +841,7 @@ async function createWindow() {
+@@ -822,7 +835,7 @@ async function createWindow() {
  
      const newWindowConfig = {
        maximized: mainWindow.isMaximized(),
@@ -175,7 +175,7 @@ index 17e47e92a..4f386f0f5 100644
        fullscreen: mainWindow.isFullScreen(),
        // oxlint-disable-next-line typescript/no-non-null-assertion
        width: size[0]!,
-@@ -2451,6 +2464,10 @@ function setupMenu(options?: Partial<CreateTemplateOptionsType>) {
+@@ -2445,6 +2458,10 @@ function setupMenu(options?: Partial<CreateTemplateOptionsType>) {
    );
    const menu = Menu.buildFromTemplate(template);
    Menu.setApplicationMenu(menu);
@@ -186,7 +186,7 @@ index 17e47e92a..4f386f0f5 100644
  
    mainWindow?.webContents.send('window:set-menu-options', {
      development: menuOptions.development,
-@@ -2721,7 +2738,15 @@ ipc.on('shutdown', () => {
+@@ -2715,7 +2732,15 @@ ipc.on('shutdown', () => {
  ipc.on(
    'set-auto-hide-menu-bar',
    (_event: Electron.Event, autoHide: boolean) => {
@@ -203,7 +203,7 @@ index 17e47e92a..4f386f0f5 100644
        mainWindow.autoHideMenuBar = autoHide;
      }
    }
-@@ -2730,7 +2755,14 @@ ipc.on(
+@@ -2724,7 +2749,14 @@ ipc.on(
  ipc.on(
    'set-menu-bar-visibility',
    (_event: Electron.Event, visibility: boolean) => {
@@ -219,7 +219,7 @@ index 17e47e92a..4f386f0f5 100644
        mainWindow.setMenuBarVisibility(visibility);
      }
    }
-@@ -3017,6 +3049,18 @@ const onEphemeralSettingChanged = (name: string) => {
+@@ -2996,6 +3028,18 @@ const onEphemeralSettingChanged = (name: string) => {
      return;
    }
  
@@ -238,7 +238,7 @@ index 17e47e92a..4f386f0f5 100644
    if (name !== 'contentProtection') {
      return;
    }
-@@ -3364,6 +3408,93 @@ ipc.handle('getMainWindowStats', async () => {
+@@ -3341,6 +3385,93 @@ ipc.handle('getMainWindowStats', async () => {
    };
  });
  
@@ -1656,7 +1656,7 @@ index a219c1c39..62fe940fd 100644
  };
  
 diff --git a/ts/windows/AppProvider.dom.tsx b/ts/windows/AppProvider.dom.tsx
-index 20b93f19c..dec0dc56a 100644
+index 418a3e658..d8d276fb9 100644
 --- a/ts/windows/AppProvider.dom.tsx
 +++ b/ts/windows/AppProvider.dom.tsx
 @@ -1,9 +1,10 @@
@@ -1671,8 +1671,8 @@ index 20b93f19c..dec0dc56a 100644
  
  export type AppProviderProps = Readonly<{
    children: ReactNode;
-@@ -23,6 +24,36 @@ export const AppProvider: FC<AppProviderProps> = memo(
-       'AxoBadge.MaxOverflow': max => i18n('icu:AxoBadge.MaxOverflow', { max }),
+@@ -24,6 +25,36 @@ export const AppProvider: FC<AppProviderProps> = memo(
+       'AxoTextField.Clear': i18n('icu:AxoTextField.Clear'),
      };
  
 +    useEffect(() => {

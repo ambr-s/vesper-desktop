@@ -1,4 +1,4 @@
-From c61be6a49be47faed353308ad311b9caa2c37eeb Mon Sep 17 00:00:00 2001
+From e64c38e52ecda542e01ddb4bd3c31f5a569a4010 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 19:04:18 +0100
 Subject: [PATCH 05/16] Isolate Vesper protocol handlers
@@ -17,7 +17,7 @@ Signed-off-by: amber <amber@flourish.ch>
  create mode 100644 ts/util/vesperProtocol.std.ts
 
 diff --git a/app/main.main.ts b/app/main.main.ts
-index 5177bc28e..84913716a 100644
+index 07e63ff63..dcacf4d72 100644
 --- a/app/main.main.ts
 +++ b/app/main.main.ts
 @@ -41,6 +41,11 @@ import { redactAll, addSensitivePath } from './privacy.main.ts';
@@ -32,7 +32,7 @@ index 5177bc28e..84913716a 100644
  import type { ThemeSettingType } from '../ts/util/theme.std.ts';
  import { ThemeType } from '../ts/types/Util.std.ts';
  import * as Errors from '../ts/types/errors.std.ts';
-@@ -519,12 +524,13 @@ function prepareUrl(
+@@ -513,12 +518,13 @@ function prepareUrl(
  }
  
  async function handleUrl(rawTarget: string) {
@@ -48,7 +48,7 @@ index 5177bc28e..84913716a 100644
  
    // We only want to specially handle urls that aren't requesting the dev server
    if (signalRoute != null) {
-@@ -2683,23 +2689,17 @@ app.on(
+@@ -2677,23 +2683,17 @@ app.on(
    }
  );
  
@@ -80,7 +80,7 @@ index 5177bc28e..84913716a 100644
  }
  
  ipc.on(
-@@ -3065,7 +3065,7 @@ const onEphemeralSettingChanged = (name: string) => {
+@@ -3044,7 +3044,7 @@ const onEphemeralSettingChanged = (name: string) => {
  
  function maybeGetIncomingSignalRoute(argv: Array<string>) {
    for (const arg of argv) {

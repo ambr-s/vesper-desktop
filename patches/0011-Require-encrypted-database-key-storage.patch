@@ -1,4 +1,4 @@
-From 1959652f9268335bf273975f1b7ab20b380593a9 Mon Sep 17 00:00:00 2001
+From 7bc8edc2dfc9e837bd7390fc6d08e0b6786b27ae Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 22:45:49 +0100
 Subject: [PATCH 11/16] Require encrypted database key storage
@@ -9,10 +9,10 @@ Signed-off-by: amber <amber@flourish.ch>
  1 file changed, 16 insertions(+), 55 deletions(-)
 
 diff --git a/app/main.main.ts b/app/main.main.ts
-index 90858fa41..17e47e92a 100644
+index 933bb6a51..86774417b 100644
 --- a/app/main.main.ts
 +++ b/app/main.main.ts
-@@ -1672,15 +1672,21 @@ function getSQLKey(): string {
+@@ -1666,15 +1666,21 @@ function getSQLKey(): string {
    const safeStorageBackend: string | undefined = isLinux
      ? safeStorage.getSelectedStorageBackend()
      : undefined;
@@ -38,7 +38,7 @@ index 90858fa41..17e47e92a 100644
    // On Linux the backend can change based on desktop environment and command line flags.
    // If the backend changes we won't be able to decrypt the key.
    if (
-@@ -1715,12 +1721,7 @@ function getSQLKey(): string {
+@@ -1709,12 +1715,7 @@ function getSQLKey(): string {
          userConfig.set('key', undefined);
        } else {
          log.warn('getSQLKey: decrypted modern key mismatch with legacy key');
@@ -52,7 +52,7 @@ index 90858fa41..17e47e92a 100644
        }
      }
  
-@@ -1748,17 +1749,12 @@ function getSQLKey(): string {
+@@ -1742,17 +1743,12 @@ function getSQLKey(): string {
  
    if (isEncryptionAvailable) {
      log.info('getSQLKey: updating encrypted key in the config');
@@ -75,7 +75,7 @@ index 90858fa41..17e47e92a 100644
  
      if (isLinux && safeStorageBackend) {
        log.info(`getSQLKey: saving safeStorageBackend: ${safeStorageBackend}`);
-@@ -1772,41 +1768,6 @@ function getSQLKey(): string {
+@@ -1766,41 +1762,6 @@ function getSQLKey(): string {
    return key;
  }
  

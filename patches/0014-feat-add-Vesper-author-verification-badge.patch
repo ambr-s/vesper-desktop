@@ -1,4 +1,4 @@
-From e1fd02c7dfa4c16a72e3ac76dbcf95e1ec0aa39d Mon Sep 17 00:00:00 2001
+From 2d251fb76869b986ba68153c9eb2bd7c8605b0ef Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sun, 26 Jul 2026 19:32:04 +0100
 Subject: [PATCH 14/16] feat: add Vesper author verification badge
@@ -347,10 +347,10 @@ index db5b6e912..f393fcbce 100644
      title,
      type,
 diff --git a/ts/state/selectors/message.preload.ts b/ts/state/selectors/message.preload.ts
-index 7ff7a3125..1fe635020 100644
+index 51e50eb0f..7219d9bec 100644
 --- a/ts/state/selectors/message.preload.ts
 +++ b/ts/state/selectors/message.preload.ts
-@@ -386,6 +386,7 @@ const getAuthorForMessage = (
+@@ -390,6 +390,7 @@ const getAuthorForMessage = (
      name,
      phoneNumber,
      profileName,
@@ -358,7 +358,7 @@ index 7ff7a3125..1fe635020 100644
      title,
    } = getContact(message, options);
  
-@@ -402,6 +403,7 @@ const getAuthorForMessage = (
+@@ -406,6 +407,7 @@ const getAuthorForMessage = (
      name,
      phoneNumber,
      profileName,
