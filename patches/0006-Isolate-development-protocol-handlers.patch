@@ -1,4 +1,4 @@
-From 58e5360ac0cc779f1a765fd11c2ec6f7b493e8e9 Mon Sep 17 00:00:00 2001
+From 602e6f2ec871dd06429120678362ad8b89ff0613 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 19:18:41 +0100
 Subject: [PATCH 06/16] Isolate development protocol handlers
@@ -14,7 +14,7 @@ Signed-off-by: amber <amber@flourish.ch>
  4 files changed, 86 insertions(+), 15 deletions(-)
 
 diff --git a/app/main.main.ts b/app/main.main.ts
-index 84913716a..90858fa41 100644
+index dcacf4d72..933bb6a51 100644
 --- a/app/main.main.ts
 +++ b/app/main.main.ts
 @@ -42,9 +42,8 @@ import { missingCaseError } from '../ts/util/missingCaseError.std.ts';
@@ -28,7 +28,7 @@ index 84913716a..90858fa41 100644
  } from '../ts/util/vesperProtocol.std.ts';
  import type { ThemeSettingType } from '../ts/util/theme.std.ts';
  import { ThemeType } from '../ts/types/Util.std.ts';
-@@ -192,6 +191,7 @@ const development =
+@@ -186,6 +185,7 @@ const development =
    getEnvironment() === Environment.Staging;
  
  const ciMode = config.get<'full' | 'benchmark' | false>('ciMode');
@@ -36,7 +36,7 @@ index 84913716a..90858fa41 100644
  const localeDirectionTestingOverride = config.has(
    'localeDirectionTestingOverride'
  )
-@@ -2689,17 +2689,23 @@ app.on(
+@@ -2683,17 +2683,23 @@ app.on(
    }
  );
  

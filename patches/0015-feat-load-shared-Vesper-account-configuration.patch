@@ -1,4 +1,4 @@
-From dfbcfa4f62626a08857a1e706c79df214ce32c6e Mon Sep 17 00:00:00 2001
+From 0c45495c69606fdfef20f59ca76cf99b1c9d93d5 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Mon, 27 Jul 2026 16:29:51 +0100
 Subject: [PATCH 15/16] feat: load shared Vesper account configuration
@@ -61,10 +61,10 @@ Signed-off-by: amber <amber@flourish.ch>
  create mode 100644 ts/test-node/VesperConfig_test.dom.ts
 
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index 907057545..cfdf8961d 100644
+index 2b1f9f382..344a0f6ab 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
-@@ -8992,6 +8992,10 @@
+@@ -8996,6 +8996,10 @@
      "messageformat": "Deletion requested",
      "description": "Local-only label shown on a message that Vesper kept after a remote deletion request"
    },
@@ -1575,10 +1575,10 @@ index 145d91f9b..3b3707057 100644
  
  export const MessageSearchResult: FunctionComponent<PropsType> = memo(
 diff --git a/ts/state/selectors/message.preload.ts b/ts/state/selectors/message.preload.ts
-index 1fe635020..cfcf8d919 100644
+index 7219d9bec..eadd93b4f 100644
 --- a/ts/state/selectors/message.preload.ts
 +++ b/ts/state/selectors/message.preload.ts
-@@ -462,6 +462,7 @@ const getReactionsForMessage = (
+@@ -466,6 +466,7 @@ const getReactionsForMessage = (
        name,
        phoneNumber,
        profileName,
@@ -1586,7 +1586,7 @@ index 1fe635020..cfcf8d919 100644
        title,
      } = c;
  
-@@ -475,6 +476,7 @@ const getReactionsForMessage = (
+@@ -479,6 +480,7 @@ const getReactionsForMessage = (
        name,
        phoneNumber,
        profileName,
@@ -1594,7 +1594,7 @@ index 1fe635020..cfcf8d919 100644
        title,
      };
  
-@@ -507,6 +509,7 @@ export type PollVoteWithUserType = {
+@@ -511,6 +513,7 @@ export type PollVoteWithUserType = {
      | 'name'
      | 'phoneNumber'
      | 'profileName'
@@ -1602,7 +1602,7 @@ index 1fe635020..cfcf8d919 100644
      | 'title'
    >;
  };
-@@ -740,6 +743,7 @@ export const getPropsForQuote = (
+@@ -765,6 +768,7 @@ export const getPropsForQuote = (
    const authorName = contact.name;
    const authorPhoneNumber = contact.phoneNumber;
    const authorProfileName = contact.profileName;
@@ -1610,7 +1610,7 @@ index 1fe635020..cfcf8d919 100644
    const authorTitle = contact.title;
    const isFromMe = authorId === ourConversationId;
  
-@@ -767,6 +771,7 @@ export const getPropsForQuote = (
+@@ -792,6 +796,7 @@ export const getPropsForQuote = (
      authorName,
      authorPhoneNumber,
      authorProfileName,
@@ -1618,7 +1618,7 @@ index 1fe635020..cfcf8d919 100644
      authorTitle,
      bodyRanges: processBodyRanges(quote, isGroup, { conversationSelector }),
      conversationColor,
-@@ -1482,7 +1487,11 @@ function getPropsForTimerNotification(
+@@ -1511,7 +1516,11 @@ function getPropsForTimerNotification(
    const { expireTimer, fromSync, source, sourceServiceId } = timerUpdate;
    const disabled = !expireTimer;
    const sourceId = sourceServiceId || source;
@@ -1631,7 +1631,7 @@ index 1fe635020..cfcf8d919 100644
  
    // Pacify typescript
    type MaybeExpireTimerType =
-@@ -1502,6 +1511,7 @@ function getPropsForTimerNotification(
+@@ -1531,6 +1540,7 @@ function getPropsForTimerNotification(
        };
  
    const basicProps = {
@@ -1639,7 +1639,7 @@ index 1fe635020..cfcf8d919 100644
      title,
      ...maybeExpireTimer,
      type: 'fromOther' as const,
-@@ -2197,6 +2207,7 @@ function getDeletedForEveryoneByAdmin(
+@@ -2226,6 +2236,7 @@ function getDeletedForEveryoneByAdmin(
        adminConversationId
      ),
      isMe: adminConversation.isMe,

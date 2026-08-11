@@ -1,4 +1,4 @@
-From f7f0338b0f41574d888cb57d04acfe37fbc21efe Mon Sep 17 00:00:00 2001
+From b2e413efd470f5f86f1373cffbee5ba0d36cd5d0 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Mon, 27 Jul 2026 16:36:40 +0100
 Subject: [PATCH 16/16] fix: satisfy desktop release lint gate

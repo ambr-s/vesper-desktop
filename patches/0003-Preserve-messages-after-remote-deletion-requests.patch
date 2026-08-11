@@ -1,4 +1,4 @@
-From d21a64409f5c884a45e53bf2065d38d03ad372e8 Mon Sep 17 00:00:00 2001
+From 30c3207a3d96b8af92daacc61c06b887fd30d615 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:54:15 +0100
 Subject: [PATCH 03/16] Preserve messages after remote deletion requests
@@ -48,10 +48,10 @@ index e61ad55f4..f7a33a7f6 100644
  
  export const enforceLicenseComments = ESLintUtils.RuleCreator.withoutDocs({
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index be46714e4..62ec0cdd4 100644
+index 45da8c30c..95c01e971 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
-@@ -8920,6 +8920,30 @@
+@@ -8924,6 +8924,30 @@
      "messageformat": "Turn off and delete",
      "description": "Action in the diagnostic logging disable confirmation"
    },
@@ -524,10 +524,10 @@ index 005a3f58e..bbcd1d67f 100644
    const props = createProps({
      conversationType: 'group',
 diff --git a/ts/model-types.d.ts b/ts/model-types.d.ts
-index e90ad8d11..b32787843 100644
+index 740bdf74f..8d172ef99 100644
 --- a/ts/model-types.d.ts
 +++ b/ts/model-types.d.ts
-@@ -199,6 +199,7 @@ export type MessageAttributesType = {
+@@ -197,6 +197,7 @@ export type MessageAttributesType = {
    deletedForEveryone?: boolean;
    deletedForEveryoneByAdminAci?: AciString;
    deletedForEveryoneTimestamp?: number;
@@ -536,10 +536,10 @@ index e90ad8d11..b32787843 100644
    expirationStartTimestamp?: number | null;
    expireTimer?: DurationInSeconds;
 diff --git a/ts/state/selectors/message.preload.ts b/ts/state/selectors/message.preload.ts
-index 3043d9bc9..7ff7a3125 100644
+index ed9f1cca8..51e50eb0f 100644
 --- a/ts/state/selectors/message.preload.ts
 +++ b/ts/state/selectors/message.preload.ts
-@@ -1001,6 +1001,7 @@ const getPropsForMessage = (
+@@ -1027,6 +1027,7 @@ const getPropsForMessage = (
      conversationType: isGroup ? 'group' : 'direct',
      customColor,
      deletedForEveryone: message.deletedForEveryone || false,

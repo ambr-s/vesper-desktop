@@ -1,4 +1,4 @@
-From 10fa727defdaf40b4f35f80ed7c5b79871209bd9 Mon Sep 17 00:00:00 2001
+From 3257f69c7cd97fcaef45b44ebf2d4fff2875f618 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:49:16 +0100
 Subject: [PATCH 02/16] Add opt-in diagnostic logging
@@ -28,10 +28,10 @@ Signed-off-by: amber <amber@flourish.ch>
  16 files changed, 187 insertions(+), 6 deletions(-)
 
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index 5e9ec1828..be46714e4 100644
+index 4cb15d7a0..45da8c30c 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
-@@ -8896,6 +8896,30 @@
+@@ -8900,6 +8900,30 @@
      "messageformat": "Disable",
      "description": "Text of the button confirm disabling screen security modal in Settings > Privacy > Application"
    },
@@ -63,7 +63,7 @@ index 5e9ec1828..be46714e4 100644
      "messageformat": "Update to version {version} available",
      "description": "Tooltip for new update available"
 diff --git a/app/main.main.ts b/app/main.main.ts
-index 8f2f9f8a2..237d45f14 100644
+index f8d9665f5..7254978d7 100644
 --- a/app/main.main.ts
 +++ b/app/main.main.ts
 @@ -46,7 +46,11 @@ import type { ThemeSettingType } from '../ts/util/theme.std.ts';
@@ -79,7 +79,7 @@ index 8f2f9f8a2..237d45f14 100644
  import * as debugLog from '../ts/logging/debuglogs.node.ts';
  import * as uploadDebugLog from '../ts/logging/uploadDebugLog.node.ts';
  import { explodePromise } from '../ts/util/explodePromise.std.ts';
-@@ -1405,6 +1409,10 @@ type DebugLogWindowOptions = {
+@@ -1399,6 +1403,10 @@ type DebugLogWindowOptions = {
  };
  
  async function showDebugLogWindow(options: DebugLogWindowOptions = {}) {
@@ -90,7 +90,7 @@ index 8f2f9f8a2..237d45f14 100644
    const newMode = options.mode ?? 'submit';
  
    if (debugLogWindow) {
-@@ -2142,6 +2150,7 @@ app.on('ready', async () => {
+@@ -2136,6 +2144,7 @@ app.on('ready', async () => {
      session: session.defaultSession,
    });
  
@@ -98,7 +98,7 @@ index 8f2f9f8a2..237d45f14 100644
    await mainProcessLogging.initialize(getMainWindow);
  
    const resourceService = OptionalResourceService.create(
-@@ -2434,6 +2443,7 @@ function setupMenu(options?: Partial<CreateTemplateOptionsType>) {
+@@ -2428,6 +2437,7 @@ function setupMenu(options?: Partial<CreateTemplateOptionsType>) {
    menuOptions = {
      // options
      development,
@@ -106,7 +106,7 @@ index 8f2f9f8a2..237d45f14 100644
      devTools: defaultWebPrefs.devTools,
      includeSetup: false,
      isNightly: isNightly(version),
-@@ -3035,6 +3045,14 @@ const sendPreferencesChangedEventToWindows = () => {
+@@ -3014,6 +3024,14 @@ const sendPreferencesChangedEventToWindows = () => {
  ipc.on('preferences-changed', sendPreferencesChangedEventToWindows);
  
  const onEphemeralSettingChanged = (name: string) => {
