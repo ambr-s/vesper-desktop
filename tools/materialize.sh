@@ -119,8 +119,10 @@ GIT_AUTHOR_DATE="$MATERIALIZE_DATE" GIT_COMMITTER_DATE="$MATERIALIZE_DATE" \
 shopt -s nullglob
 PATCHES=("$ROOT"/patches/*.patch)
 if ((${#PATCHES[@]})); then
+  # Stable exports retain old patch bytes only after proving direct application
+  # produces the exact rebased tree. Avoid --3way because filtered clones may
+  # not contain those retained patches' historical preimage blobs.
   git -C "$WORK" "${MATERIALIZER_CONFIG[@]}" am \
-    --3way \
     --committer-date-is-author-date \
     "${PATCHES[@]}"
 fi

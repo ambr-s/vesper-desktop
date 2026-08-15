@@ -1,7 +1,7 @@
-From d0c9418e89cce6ab872fdc4aa87244eea72e23b9 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sun, 26 Jul 2026 18:01:07 +0100
-Subject: [PATCH 13/16] Integrate Vesper logo and wordmark
+Subject: [PATCH 13/19] Integrate Vesper logo and wordmark
 
 Signed-off-by: amber <amber@flourish.ch>
 ---

@@ -1,7 +1,7 @@
-From 3257f69c7cd97fcaef45b44ebf2d4fff2875f618 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:49:16 +0100
-Subject: [PATCH 02/16] Add opt-in diagnostic logging
+Subject: [PATCH 02/19] Add opt-in diagnostic logging
 
 Keep logging disabled by default, apply changes without a restart, clear local logs and crash reports when disabled, and disable the Debug Log menu item while no logs are being collected.
 

@@ -1,7 +1,7 @@
-From 45144db56306bb110df89ea7dcee5eb89dd3439d Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 19:28:50 +0100
-Subject: [PATCH 07/16] Record Molly provenance in adapted settings
+Subject: [PATCH 07/19] Record Molly provenance in adapted settings
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

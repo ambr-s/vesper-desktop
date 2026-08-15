@@ -46,7 +46,7 @@ while IFS= read -r -d '' overlay_file; do
     exit 1
   }
   cp -a -- "$source_file" "$overlay_file"
-  OVERLAY_EXCLUDES+=(":(exclude)$relative_path")
+  OVERLAY_EXCLUDES+=("$relative_path")
 done < <(
   find "$ROOT/overlay" -mindepth 1 \
     \( -type f -o -type l \) \
@@ -55,16 +55,10 @@ done < <(
 )
 
 mkdir -p "$ROOT/patches"
-find "$ROOT/patches" -maxdepth 1 -type f -name '*.patch' -delete
 
 mapfile -t FEATURE_COMMITS < <(
   git -C "$WORK" rev-list --reverse "$OVERLAY_COMMIT..HEAD"
 )
-if ((${#FEATURE_COMMITS[@]} == 0)); then
-  echo "No feature commits to export; patches/ remains empty."
-  exit 0
-fi
-
 for commit in "${FEATURE_COMMITS[@]}"; do
   author="$(git -C "$WORK" show -s --format='%an <%ae>' "$commit")"
   signoffs="$(
@@ -80,8 +74,12 @@ for commit in "${FEATURE_COMMITS[@]}"; do
   fi
 done
 
-git -C "$WORK" format-patch \
-  --no-signature \
-  --output-directory "$ROOT/patches" \
-  "$OVERLAY_COMMIT..HEAD" \
-  -- . "${OVERLAY_EXCLUDES[@]}"
+EXPORT_ARGS=(
+  --work "$WORK"
+  --output "$ROOT/patches"
+  --base "$OVERLAY_COMMIT"
+)
+for relative_path in "${OVERLAY_EXCLUDES[@]}"; do
+  EXPORT_ARGS+=(--exclude "$relative_path")
+done
+python3 "$ROOT/tools/export_patches.py" "${EXPORT_ARGS[@]}"

@@ -1,7 +1,7 @@
-From 95cb919c7bbb3c4a4b93d15998c4e2bfa539dabe Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sun, 26 Jul 2026 13:53:39 +0100
-Subject: [PATCH 12/16] Add Vesper desktop palette and window chrome
+Subject: [PATCH 12/19] Add Vesper desktop palette and window chrome
 
 Signed-off-by: amber <amber@flourish.ch>
 ---

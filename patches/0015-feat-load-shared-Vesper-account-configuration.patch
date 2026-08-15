@@ -1,7 +1,7 @@
-From 0c45495c69606fdfef20f59ca76cf99b1c9d93d5 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Mon, 27 Jul 2026 16:29:51 +0100
-Subject: [PATCH 15/16] feat: load shared Vesper account configuration
+Subject: [PATCH 15/19] feat: load shared Vesper account configuration
 
 Cache and refresh the per-account Vesper config outside startup, apply account-specific flag overrides, and derive developer identity only from the hashed remote list. Show that verified identity throughout contact surfaces and on the contact information card. Also finish deletion-pill layout and Vesper-owned source attribution fixes.
 
@@ -31,7 +31,7 @@ Signed-off-by: amber <amber@flourish.ch>
  .../ContactSpoofingReviewDialogPerson.dom.tsx |   1 +
  .../conversation/GroupNotification.dom.tsx    |   6 +-
  .../conversation/GroupV1Migration.dom.tsx     |   7 +-
- ts/components/conversation/Message.dom.tsx    | 239 +++++++++--------
+ ts/components/conversation/Message.dom.tsx    | 245 +++++++++--------
  .../conversation/MessageDetail.dom.tsx        |   3 +-
  ts/components/conversation/Quote.dom.tsx      |   5 +-
  .../conversation/ReactionViewer.dom.tsx       |   2 +
@@ -56,15 +56,15 @@ Signed-off-by: amber <amber@flourish.ch>
  ts/util/isVesperAuthor.std.ts                 |   7 +-
  ts/util/vesperDeleteForEveryone.std.ts        |  17 +-
  ts/util/vesperProtocol.std.ts                 |   2 +-
- 49 files changed, 828 insertions(+), 153 deletions(-)
+ 49 files changed, 834 insertions(+), 153 deletions(-)
  create mode 100644 ts/VesperConfig.dom.ts
  create mode 100644 ts/test-node/VesperConfig_test.dom.ts
 
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index 2b1f9f382..344a0f6ab 100644
+index 14704e327..7224358b9 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
-@@ -8996,6 +8996,10 @@
+@@ -8992,6 +8992,10 @@
      "messageformat": "Deletion requested",
      "description": "Local-only label shown on a message that Vesper kept after a remote deletion request"
    },
@@ -76,10 +76,10 @@ index 2b1f9f382..344a0f6ab 100644
      "messageformat": "Update to version {version} available",
      "description": "Tooltip for new update available"
 diff --git a/stylesheets/_modules.scss b/stylesheets/_modules.scss
-index 98a60b17a..ef37ed287 100644
+index 8f4a9e8a0..f75e7438b 100644
 --- a/stylesheets/_modules.scss
 +++ b/stylesheets/_modules.scss
-@@ -1734,6 +1734,11 @@ $message-padding-horizontal: 12px;
+@@ -1738,6 +1738,11 @@ $message-padding-horizontal: 12px;
    }
  }
  
@@ -425,7 +425,7 @@ index 000000000..4ac3c91db
 +  return 'updated';
 +}
 diff --git a/ts/background.preload.ts b/ts/background.preload.ts
-index 1aa1f8e1a..08cba85c0 100644
+index 65ca429f8..4bf7fa4ef 100644
 --- a/ts/background.preload.ts
 +++ b/ts/background.preload.ts
 @@ -259,6 +259,10 @@ import {
@@ -439,7 +439,7 @@ index 1aa1f8e1a..08cba85c0 100644
  import {
    getParametersForRedux,
    loadAll,
-@@ -558,9 +562,24 @@ async function startApp(): Promise<void> {
+@@ -559,9 +563,24 @@ async function startApp(): Promise<void> {
      }
      first = false;
  
@@ -831,7 +831,7 @@ index c94bbfdfb..96feaa005 100644
        <p>
          {kind === 'invited' && (
 diff --git a/ts/components/conversation/Message.dom.tsx b/ts/components/conversation/Message.dom.tsx
-index e4f2cd4e8..4243dcf19 100644
+index f3b2df3c9..4243dcf19 100644
 --- a/ts/components/conversation/Message.dom.tsx
 +++ b/ts/components/conversation/Message.dom.tsx
 @@ -87,6 +87,7 @@ import {
@@ -1073,19 +1073,23 @@ index e4f2cd4e8..4243dcf19 100644
                        onClick={() => {
                          showContactModal({
                            conversationId,
-@@ -2475,9 +2495,10 @@ export class Message extends PureComponent<Props, State> {
+@@ -2473,7 +2493,14 @@ export class Message extends PureComponent<Props, State> {
+             id="icu:message--deletedForEveryone--incoming"
+             i18n={i18n}
              components={{
-               name: (
-                 <ContactName
+-              name: <ContactName title={author.title} />,
++              name: (
++                <ContactName
 +                  firstName={author.firstName}
-                   preferFirstName
++                  preferFirstName
 +                  serviceId={author.serviceId}
-                   title={author.title}
--                  firstName={author.firstName}
-                 />
-               ),
++                  title={author.title}
++                />
++              ),
              }}
-@@ -3417,6 +3438,7 @@ export class Message extends PureComponent<Props, State> {
+           />
+         );
+@@ -3411,6 +3438,7 @@ export class Message extends PureComponent<Props, State> {
        renderMessageContextMenu,
        text,
        textDirection,
@@ -1093,7 +1097,7 @@ index e4f2cd4e8..4243dcf19 100644
      } = this.props;
      const { isTargeted, imageBroken } = this.state;
  
-@@ -3489,43 +3511,54 @@ export class Message extends PureComponent<Props, State> {
+@@ -3483,43 +3511,54 @@ export class Message extends PureComponent<Props, State> {
        return children;
      }
  
@@ -1908,7 +1912,7 @@ index 779e5ab3f..3423e7b92 100644
  
  import { assert } from 'chai';
 diff --git a/ts/types/StorageKeys.std.ts b/ts/types/StorageKeys.std.ts
-index 539adc6ee..da53449e3 100644
+index ad4ef44ef..ce26004be 100644
 --- a/ts/types/StorageKeys.std.ts
 +++ b/ts/types/StorageKeys.std.ts
 @@ -9,6 +9,7 @@ import type {
