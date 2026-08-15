@@ -257,6 +257,7 @@ def export_patch_series(
             "--no-signoff",
             "--no-add-header",
             "--no-thread",
+            "--no-notes",
             "--numbered",
             "--subject-prefix=PATCH",
             "--suffix=.patch",
