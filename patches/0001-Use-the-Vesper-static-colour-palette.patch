@@ -1,7 +1,7 @@
-From 8ccab1c14c33793b09707f23289261c19f97a8ff Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:44:33 +0100
-Subject: [PATCH 01/16] Use the Vesper static colour palette
+Subject: [PATCH 01/19] Use the Vesper static colour palette
 
 Apply the Android palette to Desktop's legacy and Axo colour tokens while preserving the existing light, dark, and system theme modes.
 

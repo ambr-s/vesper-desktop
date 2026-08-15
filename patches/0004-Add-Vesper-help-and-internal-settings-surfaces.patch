@@ -1,7 +1,7 @@
-From ad6094d39c0c9183a947b52f7128e1e39faa05d5 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:59:37 +0100
-Subject: [PATCH 04/16] Add Vesper help and internal settings surfaces
+Subject: [PATCH 04/19] Add Vesper help and internal settings surfaces
 
 Expose the hidden settings behind seven version taps, replace the visible About content, and route help links to Vesper resources.
 
@@ -9,52 +9,21 @@ Adapted from settings and help work by Oscar Mira and other Molly contributors.
 
 Signed-off-by: amber <amber@flourish.ch>
 ---
- _locales/en/messages.json                 | 28 +++++++++++++++++++++++
- app/main.main.ts                          | 17 ++++++--------
- stylesheets/components/About.scss         | 18 +++++++--------
- ts/components/About.dom.tsx               | 22 +++++++++++-------
+ _locales/en/messages.json                 |  4 ++++
+ app/main.main.ts                          | 19 +++++++----------
+ stylesheets/components/About.scss         | 17 ++++++++-------
+ ts/components/About.dom.tsx               | 22 ++++++++++++--------
  ts/components/Preferences.dom.stories.tsx |  2 ++
- ts/components/Preferences.dom.tsx         | 25 ++++++++++++++++++++
- ts/state/smart/Preferences.preload.tsx    | 10 +++++++-
+ ts/components/Preferences.dom.tsx         | 25 +++++++++++++++++++++++
+ ts/state/smart/Preferences.preload.tsx    | 10 ++++++++-
  ts/types/StorageKeys.std.ts               |  2 ++
- 8 files changed, 95 insertions(+), 29 deletions(-)
+ 8 files changed, 71 insertions(+), 30 deletions(-)
 
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index 95c01e971..90491effd 100644
+index 816b10bd0..3838322eb 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
-@@ -127,6 +127,30 @@
-     "messageformat": "{appEnv} (Intel)",
-     "description": "AboutWindow > App Environment Info > On Apple Intel Devices"
-   },
-+  "icu:Vesper__About__Title": {
-+    "messageformat": "Vesper",
-+    "description": "Product title in the Vesper about window"
-+  },
-+  "icu:Vesper__About__SignalAcknowledgements": {
-+    "messageformat": "Signal Desktop acknowledgements",
-+    "description": "Link to the upstream Signal Desktop acknowledgements"
-+  },
-+  "icu:Vesper__About__SourceCode": {
-+    "messageformat": "Vesper source code",
-+    "description": "Link to the Vesper source repository"
-+  },
-+  "icu:Vesper__About__Licence": {
-+    "messageformat": "GNU AGPL v3 licence",
-+    "description": "Link to the Vesper licence"
-+  },
-+  "icu:Vesper__About__Attribution": {
-+    "messageformat": "Vesper is based on Signal Desktop and is free software under the GNU Affero General Public License, version 3 only.",
-+    "description": "Upstream and licence attribution in the Vesper about window"
-+  },
-+  "icu:Vesper__About__Trademark": {
-+    "messageformat": "Signal is a trademark of Signal Messenger, LLC. Vesper is not affiliated with or endorsed by Signal.",
-+    "description": "Signal trademark notice in the Vesper about window"
-+  },
-   "icu:copyErrorAndQuit": {
-     "messageformat": "Copy error and quit",
-     "description": "Shown in the top-level error popup, allowing user to copy the error text and close the app"
-@@ -8904,6 +8928,10 @@
+@@ -8928,6 +8928,10 @@
      "messageformat": "Vesper",
      "description": "Title of the Vesper section in Settings > Privacy"
    },
@@ -66,7 +35,7 @@ index 95c01e971..90491effd 100644
      "messageformat": "Diagnostic logging",
      "description": "Label of the diagnostic logging checkbox in Settings > Privacy > Vesper"
 diff --git a/app/main.main.ts b/app/main.main.ts
-index 7254978d7..07e63ff63 100644
+index 7254978d7..3d9e28ad7 100644
 --- a/app/main.main.ts
 +++ b/app/main.main.ts
 @@ -38,7 +38,6 @@ import { setup as setupCrashReports } from './crashReports.main.ts';
@@ -77,7 +46,7 @@ index 7254978d7..07e63ff63 100644
  import { missingCaseError } from '../ts/util/missingCaseError.std.ts';
  import { strictAssert } from '../ts/util/assert.std.ts';
  import { drop } from '../ts/util/drop.std.ts';
-@@ -1210,14 +1209,12 @@ const TEN_MINUTES = 10 * 60 * 1000;
+@@ -1210,14 +1209,11 @@ const TEN_MINUTES = 10 * 60 * 1000;
  setTimeout(readyForUpdates, TEN_MINUTES);
  
  function openContactUs() {
@@ -86,7 +55,7 @@ index 7254978d7..07e63ff63 100644
  }
  
  function openJoinTheBeta() {
-   // If we omit the language, the site will detect the language and redirect
+-  // If we omit the language, the site will detect the language and redirect
 -  drop(
 -    shell.openExternal('https://support.signal.org/hc/articles/360007318471')
 -  );
@@ -94,7 +63,7 @@ index 7254978d7..07e63ff63 100644
  }
  
  function openReleaseNotes() {
-@@ -1228,20 +1225,20 @@ function openReleaseNotes() {
+@@ -1228,20 +1224,19 @@ function openReleaseNotes() {
  
    drop(
      shell.openExternal(
@@ -105,7 +74,7 @@ index 7254978d7..07e63ff63 100644
  }
  
  function openSupportPage() {
-   // If we omit the language, the site will detect the language and redirect
+-  // If we omit the language, the site will detect the language and redirect
 -  drop(
 -    shell.openExternal('https://support.signal.org/hc/sections/360001602812')
 -  );
@@ -121,14 +90,13 @@ index 7254978d7..07e63ff63 100644
  
  function showKeyboardShortcuts() {
 diff --git a/stylesheets/components/About.scss b/stylesheets/components/About.scss
-index e7c0b8271..14a39f941 100644
+index 0880a87b9..4639ce795 100644
 --- a/stylesheets/components/About.scss
 +++ b/stylesheets/components/About.scss
-@@ -13,16 +13,8 @@
-   justify-content: center;
+@@ -14,15 +14,8 @@
    overflow: hidden;
    text-align: center;
--
+ 
 -  @include mixins.light-theme {
 -    background-color: variables.$color-white;
 -    color: variables.$color-black;
@@ -143,9 +111,9 @@ index e7c0b8271..14a39f941 100644
  
    img {
      margin-top: 1em;
-@@ -42,3 +34,9 @@
-   @include mixins.font-body-1-bold;
-   margin: 0;
+@@ -46,3 +39,9 @@
+ .About__Body {
+   user-select: text;
  }
 +
 +.About__Attribution {
@@ -154,7 +122,7 @@ index e7c0b8271..14a39f941 100644
 +  margin-top: 16px;
 +}
 diff --git a/ts/components/About.dom.tsx b/ts/components/About.dom.tsx
-index 5d2784ffc..fa49c16bc 100644
+index 4d42f2b98..e18e71af0 100644
 --- a/ts/components/About.dom.tsx
 +++ b/ts/components/About.dom.tsx
 @@ -5,7 +5,6 @@ import type { JSX } from 'react';
@@ -171,8 +139,8 @@ index 5d2784ffc..fa49c16bc 100644
  
 -        <h1 className="About__Title">{i18n('icu:signalDesktop')}</h1>
 +        <h1 className="About__Title">{i18n('icu:Vesper__About__Title')}</h1>
-         <div className="version">{version}</div>
-         <div className="environment">{env}</div>
+         <div className="About__Body version">{version}</div>
+         <div className="About__Body environment">{env}</div>
          <br />
          <div>
 -          <a href="https://signal.org">signal.org</a>
@@ -210,14 +178,14 @@ index 5d2784ffc..fa49c16bc 100644
        </div>
      </div>
 diff --git a/ts/components/Preferences.dom.stories.tsx b/ts/components/Preferences.dom.stories.tsx
-index 9038f7773..9bf1cc4ef 100644
+index 9038f7773..c571c270b 100644
 --- a/ts/components/Preferences.dom.stories.tsx
 +++ b/ts/components/Preferences.dom.stories.tsx
 @@ -539,6 +539,7 @@ export default {
      whoCanFindMe: PhoneNumberDiscoverability.Discoverable,
      whoCanSeeMe: PhoneNumberSharingMode.Everybody,
      zoomFactor: 1,
-+    version: '8.20.0',
++    version: '8.23.0',
  
      renderDonationsPane: ({
        contentsRef,
@@ -301,10 +269,10 @@ index 51ec201db..dc692fca7 100644
          <SettingsRow title={i18n('icu:Preferences--system')}>
            {isAutoLaunchSupported && (
 diff --git a/ts/state/smart/Preferences.preload.tsx b/ts/state/smart/Preferences.preload.tsx
-index a35f12655..777cbb35a 100644
+index d7b3aba06..5eff16e51 100644
 --- a/ts/state/smart/Preferences.preload.tsx
 +++ b/ts/state/smart/Preferences.preload.tsx
-@@ -634,7 +634,8 @@ export function SmartPreferences(): JSX.Element | null {
+@@ -639,7 +639,8 @@ export function SmartPreferences(): JSX.Element | null {
    const emojiSkinToneDefault =
      items.emojiSkinToneDefault ?? Emoji.SkinTone.None;
    const isInternalUser =
@@ -314,7 +282,7 @@ index a35f12655..777cbb35a 100644
    const isContentProtectionSupported =
      Settings.isContentProtectionSupported(OS);
    const isContentProtectionNeeded = Settings.isContentProtectionNeeded(OS);
-@@ -1086,6 +1087,7 @@ export function SmartPreferences(): JSX.Element | null {
+@@ -1091,6 +1092,7 @@ export function SmartPreferences(): JSX.Element | null {
          resetAllChatColors={resetAllChatColors}
          resetDefaultChatColor={resetDefaultChatColor}
          resolvedLocale={resolvedLocale}
@@ -322,7 +290,7 @@ index a35f12655..777cbb35a 100644
          savePreferredLeftPaneWidth={savePreferredLeftPaneWidth}
          resumeBackupMediaDownload={resumeBackupMediaDownload}
          pauseBackupMediaDownload={pauseBackupMediaDownload}
-@@ -1095,6 +1097,12 @@ export function SmartPreferences(): JSX.Element | null {
+@@ -1100,6 +1102,12 @@ export function SmartPreferences(): JSX.Element | null {
          selectedSpeaker={selectedSpeaker}
          sentMediaQualitySetting={sentMediaQualitySetting}
          setGlobalDefaultConversationColor={setGlobalDefaultConversationColor}
@@ -336,7 +304,7 @@ index a35f12655..777cbb35a 100644
          shouldShowUpdateDialog={shouldShowUpdateDialog}
          showToast={showToast}
 diff --git a/ts/types/StorageKeys.std.ts b/ts/types/StorageKeys.std.ts
-index cf13ce739..539adc6ee 100644
+index ad4ef44ef..fd60448b0 100644
 --- a/ts/types/StorageKeys.std.ts
 +++ b/ts/types/StorageKeys.std.ts
 @@ -200,6 +200,7 @@ export type StorageAccessType = {
@@ -347,7 +315,7 @@ index cf13ce739..539adc6ee 100644
    usernameLastIntegrityCheck: number;
    usernameCorrupted: boolean;
    usernameLinkCorrupted: boolean;
-@@ -398,6 +399,7 @@ export const STORAGE_KEYS_TO_PRESERVE_AFTER_UNLINK = [
+@@ -399,6 +400,7 @@ export const STORAGE_KEYS_TO_PRESERVE_AFTER_UNLINK = [
    'displayBadgesOnProfile',
    'keepMutedChatsArchived',
    'vesperKeepDeletedMessages',

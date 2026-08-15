@@ -1,0 +1,52 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sat, 15 Aug 2026 08:41:05 +0000
+Subject: [PATCH 19/19] fix: use generated Vesper localization signatures
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ ts/components/About.dom.tsx | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/ts/components/About.dom.tsx b/ts/components/About.dom.tsx
+index 4f2fa1eb7..e18e71af0 100644
+--- a/ts/components/About.dom.tsx
++++ b/ts/components/About.dom.tsx
+@@ -42,7 +42,7 @@ export function About({
+       <div className="module-splash-screen">
+         <div className="module-splash-screen__logo module-splash-screen__logo--128" />
+ 
+-        <h1 className="About__Title">{i18n('icu:Vesper__About__Title', {})}</h1>
++        <h1 className="About__Title">{i18n('icu:Vesper__About__Title')}</h1>
+         <div className="About__Body version">{version}</div>
+         <div className="About__Body environment">{env}</div>
+         <br />
+@@ -55,23 +55,23 @@ export function About({
+             className="acknowledgments"
+             href="https://github.com/signalapp/Signal-Desktop/blob/main/ACKNOWLEDGMENTS.md"
+           >
+-            {i18n('icu:Vesper__About__SignalAcknowledgements', {})}
++            {i18n('icu:Vesper__About__SignalAcknowledgements')}
+           </a>
+         </div>
+         <div>
+           <a href="https://github.com/ambr-s/vesper-desktop">
+-            {i18n('icu:Vesper__About__SourceCode', {})}
++            {i18n('icu:Vesper__About__SourceCode')}
+           </a>
+         </div>
+         <div>
+           <a href="https://github.com/ambr-s/vesper-desktop/blob/main/LICENSE">
+-            {i18n('icu:Vesper__About__Licence', {})}
++            {i18n('icu:Vesper__About__Licence')}
+           </a>
+         </div>
+         <div className="About__Attribution">
+-          {i18n('icu:Vesper__About__Attribution', {})}
++          {i18n('icu:Vesper__About__Attribution')}
+           <br />
+-          {i18n('icu:Vesper__About__Trademark', {})}
++          {i18n('icu:Vesper__About__Trademark')}
+         </div>
+       </div>
+     </div>

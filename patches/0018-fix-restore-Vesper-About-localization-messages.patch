@@ -1,0 +1,45 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sat, 15 Aug 2026 08:39:55 +0000
+Subject: [PATCH 18/19] fix: restore Vesper About localization messages
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ _locales/en/messages.json | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/_locales/en/messages.json b/_locales/en/messages.json
+index 7224358b9..defa9853f 100644
+--- a/_locales/en/messages.json
++++ b/_locales/en/messages.json
+@@ -127,6 +127,30 @@
+     "messageformat": "{appEnv} (Intel)",
+     "description": "AboutWindow > App Environment Info > On Apple Intel Devices"
+   },
++  "icu:Vesper__About__Title": {
++    "messageformat": "Vesper",
++    "description": "Product title in the Vesper about window"
++  },
++  "icu:Vesper__About__SignalAcknowledgements": {
++    "messageformat": "Signal Desktop acknowledgements",
++    "description": "Link to the upstream Signal Desktop acknowledgements"
++  },
++  "icu:Vesper__About__SourceCode": {
++    "messageformat": "Vesper source code",
++    "description": "Link to the Vesper source repository"
++  },
++  "icu:Vesper__About__Licence": {
++    "messageformat": "GNU AGPL v3 licence",
++    "description": "Link to the Vesper licence"
++  },
++  "icu:Vesper__About__Attribution": {
++    "messageformat": "Vesper is based on Signal Desktop and is free software under the GNU Affero General Public License, version 3 only.",
++    "description": "Upstream and licence attribution in the Vesper about window"
++  },
++  "icu:Vesper__About__Trademark": {
++    "messageformat": "Signal is a trademark of Signal Messenger, LLC. Vesper is not affiliated with or endorsed by Signal.",
++    "description": "Signal trademark notice in the Vesper about window"
++  },
+   "icu:copyErrorAndQuit": {
+     "messageformat": "Copy error and quit",
+     "description": "Shown in the top-level error popup, allowing user to copy the error text and close the app"
