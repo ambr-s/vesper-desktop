@@ -264,6 +264,7 @@ def export_patch_series(
             "--no-from",
             "--no-signoff",
             "--suffix=.patch",
+            "--default-prefix",
             "--output-directory",
             str(generated_directory),
             f"{base}..HEAD",
