@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:49:16 +0100
-Subject: [PATCH 02/19] Add opt-in diagnostic logging
+Subject: [PATCH 02/22] Add opt-in diagnostic logging
 
 Keep logging disabled by default, apply changes without a restart, clear local logs and crash reports when disabled, and disable the Debug Log menu item while no logs are being collected.
 
@@ -18,20 +18,19 @@ Signed-off-by: amber <amber@flourish.ch>
  ts/logging/set_up_renderer_logging.preload.ts | 10 ++++-
  ts/main/settingsChannel.main.ts               |  2 +
  ts/state/ducks/user.preload.ts                |  1 +
- ts/state/smart/Preferences.preload.tsx        | 20 +++++++++
  ts/test-node/app/menu_test.node.ts            | 29 ++++++++++++-
  ts/types/menu.std.ts                          |  1 +
  ts/util/createIPCEvents.preload.ts            | 11 ++++-
  ts/util/preload.preload.ts                    |  1 +
  ts/windows/main/preload_test.preload.ts       |  1 +
  ts/windows/preload.preload.ts                 |  1 +
- 16 files changed, 187 insertions(+), 6 deletions(-)
+ 15 files changed, 167 insertions(+), 6 deletions(-)
 
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index 4cb15d7a0..45da8c30c 100644
+index 54e57e2fb..54407529f 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
-@@ -8900,6 +8900,30 @@
+@@ -8992,6 +8992,30 @@
      "messageformat": "Disable",
      "description": "Text of the button confirm disabling screen security modal in Settings > Privacy > Application"
    },
@@ -142,7 +141,7 @@ index a8eb0ad12..a0f839e29 100644
          ...(devTools
            ? [
 diff --git a/ts/components/Preferences.dom.stories.tsx b/ts/components/Preferences.dom.stories.tsx
-index 803a980c0..7fe5da66f 100644
+index 3cde44900..716045901 100644
 --- a/ts/components/Preferences.dom.stories.tsx
 +++ b/ts/components/Preferences.dom.stories.tsx
 @@ -468,6 +468,7 @@ export default {
@@ -162,10 +161,10 @@ index 803a980c0..7fe5da66f 100644
      onEmojiSkinToneDefaultChange: action('onEmojiSkinToneDefaultChange'),
      onHasKeyTransparencyDisabledChanged: action(
 diff --git a/ts/components/Preferences.dom.tsx b/ts/components/Preferences.dom.tsx
-index a5ffcb4fb..bd14797b7 100644
+index fecf0da4e..11803a35b 100644
 --- a/ts/components/Preferences.dom.tsx
 +++ b/ts/components/Preferences.dom.tsx
-@@ -141,6 +141,7 @@ export type PropsDataType = {
+@@ -147,6 +147,7 @@ export type PropsDataType = {
    hasCallNotifications: boolean;
    hasCallRingtoneNotification: boolean;
    hasContentProtection: boolean | undefined;
@@ -173,7 +172,7 @@ index a5ffcb4fb..bd14797b7 100644
    hasCountMutedConversations: boolean;
    hasHideMenuBar?: boolean;
    hasIncomingCallNotifications: boolean;
-@@ -322,6 +323,7 @@ type PropsFunctionType = {
+@@ -328,6 +329,7 @@ type PropsFunctionType = {
    onCallNotificationsChange: CheckboxChangeHandlerType;
    onCallRingtoneNotificationChange: CheckboxChangeHandlerType;
    onContentProtectionChange: CheckboxChangeHandlerType;
@@ -181,7 +180,7 @@ index a5ffcb4fb..bd14797b7 100644
    onCountMutedConversationsChange: CheckboxChangeHandlerType;
    onEmojiSkinToneDefaultChange: (emojiSkinTone: Emoji.SkinTone) => void;
    onHasKeyTransparencyDisabledChanged: SelectChangeHandlerType<boolean>;
-@@ -450,6 +452,7 @@ export function Preferences({
+@@ -456,6 +458,7 @@ export function Preferences({
    hasCallNotifications,
    hasCallRingtoneNotification,
    hasContentProtection,
@@ -189,7 +188,7 @@ index a5ffcb4fb..bd14797b7 100644
    hasCountMutedConversations,
    hasFailedStorySends,
    hasHideMenuBar,
-@@ -502,6 +505,7 @@ export function Preferences({
+@@ -508,6 +511,7 @@ export function Preferences({
    onCallNotificationsChange,
    onCallRingtoneNotificationChange,
    onContentProtectionChange,
@@ -197,7 +196,7 @@ index a5ffcb4fb..bd14797b7 100644
    onCountMutedConversationsChange,
    onEmojiSkinToneDefaultChange,
    onHasKeyTransparencyDisabledChanged,
-@@ -615,6 +619,7 @@ export function Preferences({
+@@ -621,6 +625,7 @@ export function Preferences({
    const [confirmStoriesOff, setConfirmStoriesOff] = useState(false);
    const [confirmContentProtection, setConfirmContentProtection] =
      useState(false);
@@ -205,7 +204,7 @@ index a5ffcb4fb..bd14797b7 100644
    const [showSyncFailed, setShowSyncFailed] = useState(false);
    const [nowSyncing, setNowSyncing] = useState(false);
    const [showDisappearingTimerDialog, setShowDisappearingTimerDialog] =
-@@ -1863,6 +1868,43 @@ export function Preferences({
+@@ -1869,6 +1874,43 @@ export function Preferences({
              </AxoConfirmDialog.Action>
            </AxoConfirmDialog.Root>
          ) : null}
@@ -366,72 +365,6 @@ index 0724e8a2e..85d3d3f77 100644
        devTools: false,
        includeSetup: false,
        isNightly: false,
-diff --git a/ts/state/smart/Preferences.preload.tsx b/ts/state/smart/Preferences.preload.tsx
-index 1c358ed49..35fbe8b93 100644
---- a/ts/state/smart/Preferences.preload.tsx
-+++ b/ts/state/smart/Preferences.preload.tsx
-@@ -119,6 +119,7 @@ import type { ExternalProps as SmartNotificationProfilesProps } from './Preferen
- import { useMegaphonesActions } from '../ducks/megaphones.preload.ts';
- import type { ZoomFactorType } from '../../types/StorageKeys.std.ts';
- import { isLocalBackupsEnabled } from '../../util/isLocalBackupsEnabled.preload.ts';
-+import { deleteAllLogs } from '../../util/deleteAllLogs.preload.ts';
- import { getBackupKeyHash } from '../../services/backups/crypto.preload.ts';
- import { Emoji } from '../../axo/emoji.std.ts';
- import { AppProvider } from '../../windows/AppProvider.dom.tsx';
-@@ -404,6 +405,7 @@ export function SmartPreferences(): JSX.Element | null {
-     useState<SystemTraySetting>();
-   const [hasContentProtection, setContentProtection] = useState<boolean>();
-   const [hasSpellCheck, setSpellCheck] = useState<boolean>();
-+  const [hasDebugLogging, setDebugLogging] = useState<boolean>();
-   const [themeSetting, setThemeSetting] = useState<ThemeType>();
- 
-   useEffect(() => {
-@@ -442,6 +444,15 @@ export function SmartPreferences(): JSX.Element | null {
-     };
-     drop(loadContentProtection());
- 
-+    const loadDebugLogging = async () => {
-+      const value = await window.Events.getDebugLogging();
-+      if (canceled) {
-+        return;
-+      }
-+      setDebugLogging(value);
-+    };
-+    drop(loadDebugLogging());
-+
-     const loadThemeSetting = async () => {
-       const value = await window.Events.getThemeSetting();
-       if (canceled) {
-@@ -486,6 +497,13 @@ export function SmartPreferences(): JSX.Element | null {
-     setContentProtection(value);
-     await window.Events.setContentProtection(value);
-   };
-+  const onDebugLoggingChange = async (value: boolean) => {
-+    setDebugLogging(value);
-+    await window.Events.setDebugLogging(value);
-+    if (!value) {
-+      await Promise.all([deleteAllLogs(), window.IPC.crashReports.erase()]);
-+    }
-+  };
-   const onThemeChange = (value: ThemeType) => {
-     setThemeSetting(value);
-     drop(window.Events.setThemeSetting(value));
-@@ -940,6 +958,7 @@ export function SmartPreferences(): JSX.Element | null {
-         hasCallNotifications={hasCallNotifications}
-         hasCallRingtoneNotification={hasCallRingtoneNotification}
-         hasContentProtection={hasContentProtection}
-+        hasDebugLogging={hasDebugLogging}
-         hasCountMutedConversations={hasCountMutedConversations}
-         hasFailedStorySends={hasFailedStorySends}
-         hasHideMenuBar={hasHideMenuBar}
-@@ -994,6 +1013,7 @@ export function SmartPreferences(): JSX.Element | null {
-         onCallNotificationsChange={onCallNotificationsChange}
-         onCallRingtoneNotificationChange={onCallRingtoneNotificationChange}
-         onContentProtectionChange={onContentProtectionChange}
-+        onDebugLoggingChange={onDebugLoggingChange}
-         onCountMutedConversationsChange={onCountMutedConversationsChange}
-         onEmojiSkinToneDefaultChange={onEmojiSkinToneDefaultChange}
-         onHasKeyTransparencyDisabledChanged={
 diff --git a/ts/test-node/app/menu_test.node.ts b/ts/test-node/app/menu_test.node.ts
 index 9c38b9148..9dc959876 100644
 --- a/ts/test-node/app/menu_test.node.ts

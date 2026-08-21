@@ -1,0 +1,375 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sun, 26 Jul 2026 18:01:07 +0100
+Subject: [PATCH 12/22] Integrate Vesper logo and wordmark
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ stylesheets/components/VesperTitleBar.scss | 154 ++++++++++++++++
+ ts/components/VesperTitleBar.dom.tsx       | 196 +++++++++++++++++++++
+ 2 files changed, 350 insertions(+)
+ create mode 100644 stylesheets/components/VesperTitleBar.scss
+ create mode 100644 ts/components/VesperTitleBar.dom.tsx
+
+diff --git a/stylesheets/components/VesperTitleBar.scss b/stylesheets/components/VesperTitleBar.scss
+new file mode 100644
+index 000000000..717a84bb5
+--- /dev/null
++++ b/stylesheets/components/VesperTitleBar.scss
+@@ -0,0 +1,154 @@
++// Copyright 2026 Signal Messenger, LLC
++// SPDX-License-Identifier: AGPL-3.0-only
++
++.VesperTitleBar {
++  align-items: stretch;
++  background: var(--axo-color-surface-primary);
++  border-block-end: 1px solid var(--axo-color-border-primary);
++  color: var(--axo-color-label-primary);
++  display: flex;
++  flex: 0 0 40px;
++  height: 40px;
++  user-select: none;
++  z-index: 10;
++
++  button {
++    -webkit-app-region: no-drag;
++  }
++
++  &__identity {
++    align-items: center;
++    display: flex;
++    flex: 0 0 102px;
++    font-size: 13px;
++    font-weight: 600;
++    gap: 7px;
++    letter-spacing: 0.01em;
++    padding-inline: 12px 8px;
++  }
++
++  &__logo {
++    height: 18px;
++    width: 18px;
++  }
++
++  &__menus {
++    align-items: stretch;
++    display: flex;
++    flex: 0 0 270px;
++    visibility: visible;
++
++    &[aria-hidden='true'] {
++      visibility: hidden;
++    }
++  }
++
++  &__menu,
++  &__control {
++    background: transparent;
++    border: 0;
++    color: inherit;
++    font: inherit;
++    margin: 0;
++    outline: 0;
++  }
++
++  &__menu {
++    border-radius: 5px;
++    font-size: 13px;
++    margin-block: 5px;
++    padding-inline: 8px;
++
++    &:hover,
++    &:focus-visible,
++    &[data-open='true'] {
++      background: var(--axo-color-fill-primary);
++    }
++
++    &:focus-visible {
++      box-shadow: inset 0 0 0 1px var(--axo-color-border-selected);
++    }
++  }
++
++  &__drag-space {
++    flex: 1 1 auto;
++    min-width: 12px;
++  }
++
++  &__controls {
++    display: flex;
++    flex: 0 0 138px;
++  }
++
++  &__control {
++    align-items: center;
++    display: flex;
++    height: 39px;
++    justify-content: center;
++    position: relative;
++    width: 46px;
++
++    &:hover,
++    &:focus-visible {
++      background: var(--axo-color-fill-primary);
++    }
++
++    &::before,
++    &::after {
++      box-sizing: border-box;
++      content: '';
++      position: absolute;
++    }
++
++    &--minimize::before {
++      background: currentColor;
++      height: 1px;
++      width: 10px;
++    }
++
++    &--maximize::before {
++      border: 1px solid currentColor;
++      height: 10px;
++      width: 10px;
++    }
++
++    &--restore::before,
++    &--restore::after {
++      border: 1px solid currentColor;
++      height: 8px;
++      width: 9px;
++    }
++
++    &--restore::before {
++      inset-block-start: 13px;
++      inset-inline-start: 20px;
++    }
++
++    &--restore::after {
++      background: var(--axo-color-surface-primary);
++      inset-block-start: 17px;
++      inset-inline-start: 16px;
++    }
++
++    &--close:hover,
++    &--close:focus-visible {
++      background: #c42b1c;
++      color: #fff;
++    }
++
++    &--close::before,
++    &--close::after {
++      background: currentColor;
++      height: 1px;
++      width: 12px;
++    }
++
++    &--close::before {
++      rotate: 45deg;
++    }
++
++    &--close::after {
++      rotate: -45deg;
++    }
++  }
++}
+diff --git a/ts/components/VesperTitleBar.dom.tsx b/ts/components/VesperTitleBar.dom.tsx
+new file mode 100644
+index 000000000..5215e2245
+--- /dev/null
++++ b/ts/components/VesperTitleBar.dom.tsx
+@@ -0,0 +1,196 @@
++// Copyright 2026 Signal Messenger, LLC
++// SPDX-License-Identifier: AGPL-3.0-only
++
++import type {
++  JSX,
++  KeyboardEvent as ReactKeyboardEvent,
++  MouseEvent as ReactMouseEvent,
++} from 'react';
++import { useEffect, useRef, useState } from 'react';
++
++import { AxoDragRegion } from '../axo/AxoDragRegion.dom.tsx';
++import type { TitleBarMenuItemType } from '../window.d.ts';
++
++type PropsType = Readonly<{
++  isMaximized: boolean;
++}>;
++
++export function VesperTitleBar({ isMaximized }: PropsType): JSX.Element {
++  const { i18n } = window.SignalContext;
++  const [menuItems, setMenuItems] = useState<
++    ReadonlyArray<TitleBarMenuItemType>
++  >([]);
++  const [menuVisible, setMenuVisible] = useState(false);
++  const [openMenuIndex, setOpenMenuIndex] = useState<number>();
++  const altState = useRef({ pressed: false, usedWithAnotherKey: false });
++
++  useEffect(() => {
++    let canceled = false;
++
++    const loadTitleBarState = async () => {
++      const state = await window.IPC.getTitleBarState();
++      if (canceled) {
++        return;
++      }
++      setMenuItems(state.menuItems);
++      setMenuVisible(state.menuVisible);
++    };
++    void loadTitleBarState();
++
++    const unsubscribe = window.IPC.onTitleBarMenuVisibilityChange(visible => {
++      setMenuVisible(visible);
++    });
++
++    const onKeyDown = (event: KeyboardEvent) => {
++      if (event.key === 'Alt') {
++        if (!event.repeat) {
++          altState.current = {
++            pressed: true,
++            usedWithAnotherKey: false,
++          };
++        }
++        event.preventDefault();
++        return;
++      }
++
++      if (altState.current.pressed) {
++        altState.current.usedWithAnotherKey = true;
++      }
++    };
++
++    const onKeyUp = (event: KeyboardEvent) => {
++      if (event.key !== 'Alt') {
++        return;
++      }
++      if (altState.current.pressed && !altState.current.usedWithAnotherKey) {
++        setMenuVisible(visible => !visible);
++      }
++      altState.current = { pressed: false, usedWithAnotherKey: false };
++      event.preventDefault();
++    };
++
++    const resetAltState = () => {
++      altState.current = { pressed: false, usedWithAnotherKey: false };
++    };
++
++    window.addEventListener('keydown', onKeyDown, true);
++    window.addEventListener('keyup', onKeyUp, true);
++    window.addEventListener('blur', resetAltState);
++
++    return () => {
++      canceled = true;
++      unsubscribe();
++      window.removeEventListener('keydown', onKeyDown, true);
++      window.removeEventListener('keyup', onKeyUp, true);
++      window.removeEventListener('blur', resetAltState);
++    };
++  }, []);
++
++  const openMenu = async (
++    item: TitleBarMenuItemType,
++    event:
++      | ReactKeyboardEvent<HTMLButtonElement>
++      | ReactMouseEvent<HTMLButtonElement>
++  ) => {
++    const rect = event.currentTarget.getBoundingClientRect();
++    setOpenMenuIndex(item.index);
++    try {
++      await window.IPC.popupTitleBarMenu(item.index, rect.left, rect.bottom);
++    } finally {
++      setOpenMenuIndex(undefined);
++    }
++  };
++
++  return (
++    <AxoDragRegion.Root always>
++      <header
++        className="VesperTitleBar"
++        onDoubleClick={event => {
++          if (!(event.target as HTMLElement).closest('button')) {
++            window.IPC.titleBarDoubleClick();
++          }
++        }}
++      >
++        <div className="VesperTitleBar__identity" aria-label="Vesper">
++          <img
++            className="VesperTitleBar__logo"
++            src="images/vesper-logo.svg"
++            alt=""
++          />
++          <span>Vesper</span>
++        </div>
++
++        <nav
++          className="VesperTitleBar__menus"
++          aria-label={i18n('icu:VesperTitleBar--menu')}
++          aria-hidden={!menuVisible}
++        >
++          {menuItems.map(item => (
++            <button
++              className="VesperTitleBar__menu"
++              data-open={openMenuIndex === item.index || undefined}
++              key={item.index}
++              onClick={event => {
++                void openMenu(item, event);
++              }}
++              onKeyDown={event => {
++                if (event.key === 'ArrowDown') {
++                  event.preventDefault();
++                  void openMenu(item, event);
++                }
++              }}
++              tabIndex={menuVisible ? 0 : -1}
++              type="button"
++            >
++              {item.label}
++            </button>
++          ))}
++        </nav>
++
++        <div className="VesperTitleBar__drag-space" />
++
++        <div className="VesperTitleBar__controls">
++          <button
++            aria-label={i18n('icu:windowMenuMinimize')}
++            className="VesperTitleBar__control VesperTitleBar__control--minimize"
++            onClick={() => {
++              void window.IPC.titleBarWindowAction('minimize');
++            }}
++            title={i18n('icu:windowMenuMinimize')}
++            type="button"
++          />
++          <button
++            aria-label={
++              isMaximized
++                ? i18n('icu:VesperTitleBar--restore')
++                : i18n('icu:windowMenuZoom')
++            }
++            className={`VesperTitleBar__control ${
++              isMaximized
++                ? 'VesperTitleBar__control--restore'
++                : 'VesperTitleBar__control--maximize'
++            }`}
++            onClick={() => {
++              void window.IPC.titleBarWindowAction('toggle-maximize');
++            }}
++            title={
++              isMaximized
++                ? i18n('icu:VesperTitleBar--restore')
++                : i18n('icu:windowMenuZoom')
++            }
++            type="button"
++          />
++          <button
++            aria-label={i18n('icu:windowMenuClose')}
++            className="VesperTitleBar__control VesperTitleBar__control--close"
++            onClick={() => {
++              void window.IPC.titleBarWindowAction('close');
++            }}
++            title={i18n('icu:windowMenuClose')}
++            type="button"
++          />
++        </div>
++      </header>
++    </AxoDragRegion.Root>
++  );
++}

@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 15 Aug 2026 08:39:55 +0000
-Subject: [PATCH 18/19] fix: restore Vesper About localization messages
+Subject: [PATCH 17/22] fix: restore Vesper About localization messages
 
 Signed-off-by: amber <amber@flourish.ch>
 ---

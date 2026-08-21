@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Fri, 21 Aug 2026 14:21:34 +0000
+Subject: [PATCH 19/22] fix: restore brand theme helpers
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ ts/util/theme.std.ts | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/ts/util/theme.std.ts b/ts/util/theme.std.ts
+index 2421ed697..8d3d0e734 100644
+--- a/ts/util/theme.std.ts
++++ b/ts/util/theme.std.ts
+@@ -13,6 +13,13 @@ export enum Theme {
+ export const themeSettingSchema = z.enum(['system', 'light', 'dark']);
+ export type ThemeSettingType = z.infer<typeof themeSettingSchema>;
+ 
++export const brandThemeSchema = z.enum(['vesper', 'signal']);
++export type BrandThemeType = z.infer<typeof brandThemeSchema>;
++
++export function brandThemeClassName(brandTheme: BrandThemeType): string {
++  return `${brandTheme}-brand-theme`;
++}
++
+ export function themeClassName(theme: Theme): string {
+   switch (theme) {
+     case Theme.Light:

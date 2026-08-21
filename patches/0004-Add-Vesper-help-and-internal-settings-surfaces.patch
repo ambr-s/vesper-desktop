@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:59:37 +0100
-Subject: [PATCH 04/19] Add Vesper help and internal settings surfaces
+Subject: [PATCH 04/22] Add Vesper help and internal settings surfaces
 
 Expose the hidden settings behind seven version taps, replace the visible About content, and route help links to Vesper resources.
 

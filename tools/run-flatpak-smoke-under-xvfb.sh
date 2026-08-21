@@ -124,6 +124,15 @@ stop_app() {
 trap stop_app EXIT
 trap 'exit 124' INT TERM
 
+APP_ARGS=(
+  --ozone-platform=x11
+  "--user-data-dir=$SMOKE_ROOT/Vesper"
+  --start-in-tray
+)
+if ((EUID == 0)); then
+  APP_ARGS+=(--no-sandbox)
+fi
+
 flatpak run \
   --user \
   --die-with-parent \
@@ -135,9 +144,7 @@ flatpak run \
   --filesystem="$SMOKE_ROOT_PARENT" \
   --env=VESPER_DISABLE_GPU=1 \
   "$APP_ID" \
-  --ozone-platform=x11 \
-  "--user-data-dir=$SMOKE_ROOT/Vesper" \
-  --start-in-tray &
+  "${APP_ARGS[@]}" &
 APP_PID=$!
 
 for ((attempt = 0; attempt < SMOKE_SECONDS * 4; attempt += 1)); do
