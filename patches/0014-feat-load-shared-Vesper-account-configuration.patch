@@ -1,0 +1,106 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Mon, 27 Jul 2026 16:29:51 +0100
+Subject: [PATCH 14/22] feat: load shared Vesper account configuration
+
+Cache and refresh the per-account Vesper config outside startup, apply account-specific flag overrides, and derive developer identity only from the hashed remote list. Show that verified identity throughout contact surfaces and on the contact information card. Also finish deletion-pill layout and Vesper-owned source attribution fixes.
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ stylesheets/components/BrandTheme.scss | 87 ++++++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
+ create mode 100644 stylesheets/components/BrandTheme.scss
+
+diff --git a/stylesheets/components/BrandTheme.scss b/stylesheets/components/BrandTheme.scss
+new file mode 100644
+index 000000000..e03009bca
+--- /dev/null
++++ b/stylesheets/components/BrandTheme.scss
+@@ -0,0 +1,87 @@
++// Copyright 2026 Signal Messenger, LLC
++// SPDX-License-Identifier: AGPL-3.0-only
++
++@use 'sass:color';
++
++$vesper-indigo: #6448e5;
++$signal-ultramarine-start: #0552f0;
++$signal-ultramarine-end: #2c6bed;
++
++body.vesper-brand-theme {
++  .module-message__container--outgoing-indigo,
++  .ConversationDetails__chat-color--indigo,
++  .ChatColorPicker__bubble--indigo,
++  .GradientDial__knob--indigo,
++  .CustomColorEditor__gradient-knob--indigo {
++    background-color: $vesper-indigo;
++  }
++
++  .module-quote--incoming-indigo,
++  .module-quote--compose-indigo {
++    .module-quote__primary {
++      border-inline-start-color: $vesper-indigo;
++    }
++  }
++}
++
++body.light-theme.vesper-brand-theme {
++  .module-quote--incoming-indigo,
++  .module-quote--outgoing-indigo,
++  .module-quote--compose-indigo {
++    background-color: color.scale($vesper-indigo, $lightness: 60%);
++  }
++}
++
++body.dark-theme.vesper-brand-theme {
++  .module-quote--incoming-indigo,
++  .module-quote--outgoing-indigo,
++  .module-quote--compose-indigo {
++    background-color: color.scale($vesper-indigo, $lightness: -40%);
++  }
++}
++
++body.signal-brand-theme {
++  .module-message__container--outgoing-ultramarine,
++  .ConversationDetails__chat-color--ultramarine,
++  .ChatColorPicker__bubble--ultramarine,
++  .GradientDial__knob--ultramarine,
++  .CustomColorEditor__gradient-knob--ultramarine {
++    background-image: linear-gradient(
++      180deg,
++      $signal-ultramarine-start,
++      $signal-ultramarine-end
++    );
++  }
++
++  .module-quote--compose-ultramarine,
++  .module-quote--incoming-ultramarine {
++    .module-quote__primary,
++    &.module-quote__reference-warning {
++      border-inline-start-color: $signal-ultramarine-start;
++    }
++  }
++}
++
++body.light-theme.signal-brand-theme {
++  .module-quote--compose-ultramarine,
++  .module-quote--incoming-ultramarine,
++  .module-quote--outgoing-ultramarine {
++    background-image: linear-gradient(
++      180deg,
++      color.scale($signal-ultramarine-start, $lightness: 60%),
++      color.scale($signal-ultramarine-end, $lightness: 60%)
++    );
++  }
++}
++
++body.dark-theme.signal-brand-theme {
++  .module-quote--compose-ultramarine,
++  .module-quote--incoming-ultramarine,
++  .module-quote--outgoing-ultramarine {
++    background-image: linear-gradient(
++      180deg,
++      color.scale($signal-ultramarine-start, $lightness: -40%),
++      color.scale($signal-ultramarine-end, $lightness: -40%)
++    );
++  }
++}

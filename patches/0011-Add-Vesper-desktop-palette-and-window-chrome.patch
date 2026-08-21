@@ -1,0 +1,220 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sun, 26 Jul 2026 13:53:39 +0100
+Subject: [PATCH 11/22] Add Vesper desktop palette and window chrome
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ ts/axo/_tailwind-theme/colors.css      | 83 ++++++++++++++++++++++++++
+ ts/state/smart/Preferences.preload.tsx | 18 +++++-
+ ts/windows/AppProvider.dom.tsx         | 33 +++++++++-
+ 3 files changed, 132 insertions(+), 2 deletions(-)
+
+diff --git a/ts/axo/_tailwind-theme/colors.css b/ts/axo/_tailwind-theme/colors.css
+index 4982fb3a8..edb9c29a0 100644
+--- a/ts/axo/_tailwind-theme/colors.css
++++ b/ts/axo/_tailwind-theme/colors.css
+@@ -530,3 +530,86 @@
+   --axo-color-legacy-signal-chat-message-bg:   light-dark(#8889B4, #444664);
+   --axo-color-legacy-warning-badge:            light-dark(#C84118, #EB977D);
+ }
++
++ * Signal palette
++ * ----------------------------------------------------------------------------
++ * Keep Signal's upstream desktop palette available as an appearance choice.
++ */
++
++/* prettier-ignore */
++@layer theme {
++  body.signal-brand-theme {
++    --axo-color-brand-primary: #3b45fd;
++    --axo-color-label-accent:               light-dark(#030ffc, #99a1ff);
++    --axo-color-label-accent-disabled:      light-dark(--alpha(#030ffc / 25%), --alpha(#99a1ff / 25%));
++    --axo-color-label-destructive:          light-dark(#f21602, #ff4a3a);
++    --axo-color-label-destructive-disabled: light-dark(--alpha(#f21602 / 25%), --alpha(#ff4a3a / 25%));
++
++    --axo-color-surface-primary:          light-dark(#fafafa, #191919);
++    --axo-color-surface-secondary:        light-dark(#f5f5f5, #1e1e1e);
++    --axo-color-surface-tertiary:         light-dark(#f0f0f0, #282828);
++    --axo-color-surface-quaternary:       light-dark(#e6e6e6, #373737);
++    --axo-color-surface-card:             light-dark(#ffffff, --alpha(#969696 / 8%));
++    --axo-color-surface-message-incoming: light-dark(#ebebeb, #323232);
++    --axo-color-surface-message-outgoing: light-dark(#2267f5, #2267f5);
++
++    --axo-color-material-primary:            light-dark(--alpha(#fafafa / 90%), --alpha(#191919 / 90%));
++    --axo-color-material-secondary:          light-dark(--alpha(#f4f4f4 / 90%), --alpha(#1f1f1f / 90%));
++    --axo-color-material-tertiary:           light-dark(--alpha(#efefef / 90%), --alpha(#2a2a2a / 90%));
++    --axo-color-material-tertiary-pressed:   light-dark(--alpha(#e9e9e9 / 90%), --alpha(#2f2f2f / 90%));
++    --axo-color-material-quaternary:         light-dark(--alpha(#e4e4e4 / 90%), --alpha(#353535 / 90%));
++    --axo-color-material-quaternary-pressed: light-dark(--alpha(#dedede / 90%), --alpha(#3a3a3a / 90%));
++    --axo-color-material-dialog:             light-dark(--alpha(#fafafa / 90%), --alpha(#353535 / 90%));
++
++    --axo-color-fill-accent:                     light-dark(#4655ff, #5563ff);
++    --axo-color-fill-accent-pressed:             light-dark(#3b4af4, #616eff);
++    --axo-color-fill-accent-bright:              light-dark(#b2b9ff, #b2b9ff);
++    --axo-color-fill-accent-bright-pressed:      light-dark(#a8b0ff, #a8b0ff);
++    --axo-color-fill-accent-tint:                light-dark(--alpha(#030ffc / 6%), --alpha(#99a1ff / 12%));
++    --axo-color-fill-accent-tint-pressed:        light-dark(--alpha(#030ffc / 10%), --alpha(#99a1ff / 16%));
++    --axo-color-fill-destructive:                light-dark(#f21c0d, #ee382c);
++    --axo-color-fill-destructive-pressed:        light-dark(#e41a0c, #ef493e);
++    --axo-color-fill-destructive-tint:           light-dark(--alpha(#f21602 / 6%), --alpha(#ff4a3a / 12%));
++    --axo-color-fill-destructive-tint-pressed:   light-dark(--alpha(#f21602 / 10%), --alpha(#ff4a3a / 16%));
++
++    --axo-color-border-selected: light-dark(#4655ff, #c9ceff);
++  }
++
++  @media (prefers-contrast: more) {
++    body.signal-brand-theme {
++      --axo-color-label-accent:               light-dark(#000cf3, #b6bcff);
++      --axo-color-label-accent-disabled:      light-dark(--alpha(#000cf3 / 40%), --alpha(#b6bcff / 40%));
++      --axo-color-label-destructive:          light-dark(#a20d00, #ff9e99);
++      --axo-color-label-destructive-disabled: light-dark(--alpha(#a20d00 / 40%), --alpha(#ff9e99 / 40%));
++
++      --axo-color-surface-primary:          light-dark(#fafafa, #191919);
++      --axo-color-surface-secondary:        light-dark(#f5f5f5, #1e1e1e);
++      --axo-color-surface-tertiary:         light-dark(#f0f0f0, #282828);
++      --axo-color-surface-quaternary:       light-dark(#e6e6e6, #373737);
++      --axo-color-surface-card:             light-dark(#ffffff, --alpha(#969696 / 8%));
++      --axo-color-surface-message-incoming: light-dark(#e1e1e1, #3c3c3c);
++      --axo-color-surface-message-outgoing: light-dark(#0842b9, #0842b9);
++
++      --axo-color-material-primary:            light-dark(#fafafa, #191919);
++      --axo-color-material-secondary:          light-dark(#f5f5f5, #1e1e1e);
++      --axo-color-material-tertiary:           light-dark(#f0f0f0, #282828);
++      --axo-color-material-tertiary-pressed:   light-dark(#ebebeb, #2d2d2d);
++      --axo-color-material-quaternary:         light-dark(#e6e6e6, #323232);
++      --axo-color-material-quaternary-pressed: light-dark(#e1e1e1, #373737);
++      --axo-color-material-dialog:             light-dark(#fafafa, #323232);
++
++      --axo-color-fill-accent:                     light-dark(#1f31ff, #2536f9);
++      --axo-color-fill-accent-pressed:             light-dark(#0519ff, #2e3ffa);
++      --axo-color-fill-accent-bright:              light-dark(#b2b9ff, #b2b9ff);
++      --axo-color-fill-accent-bright-pressed:      light-dark(#a8b0ff, #a8b0ff);
++      --axo-color-fill-accent-tint:                light-dark(--alpha(#030ffc / 10%), --alpha(#99a1ff / 18%));
++      --axo-color-fill-accent-tint-pressed:        light-dark(--alpha(#030ffc / 14%), --alpha(#99a1ff / 22%));
++      --axo-color-fill-destructive:                light-dark(#b80c00, #b80c00);
++      --axo-color-fill-destructive-pressed:        light-dark(#a80b00, #c20d00);
++      --axo-color-fill-destructive-tint:           light-dark(--alpha(#d91304 / 12%), --alpha(#ff4a3a / 20%));
++      --axo-color-fill-destructive-tint-pressed:   light-dark(--alpha(#d91304 / 16%), --alpha(#ff4a3a / 24%));
++
++      --axo-color-border-selected: light-dark(#3243ff, #c9ceff);
++    }
++  }
++}
+diff --git a/ts/state/smart/Preferences.preload.tsx b/ts/state/smart/Preferences.preload.tsx
+index c602f2c37..846bb9ceb 100644
+--- a/ts/state/smart/Preferences.preload.tsx
++++ b/ts/state/smart/Preferences.preload.tsx
+@@ -115,6 +115,7 @@ import {
+ import type { SettingsLocation } from '../../types/Nav.std.ts';
+ import type { StorageAccessType } from '../../types/Storage.d.ts';
+ import type { ThemeType } from '../../util/preload.preload.ts';
++import type { BrandThemeType } from '../../util/theme.std.ts';
+ import type { WidthBreakpoint } from '../../components/_util.std.ts';
+ import type { StateType } from '../reducer.preload.ts';
+ import { DonationsErrorBoundary } from '../../components/DonationsErrorBoundary.dom.tsx';
+@@ -452,6 +453,15 @@ export function SmartPreferences(): JSX.Element | null {
+     };
+     drop(loadThemeSetting());
+ 
++    const loadBrandTheme = async () => {
++      const value = await window.Events.getBrandTheme();
++      if (canceled) {
++        return;
++      }
++      setBrandTheme(value);
++    };
++    drop(loadBrandTheme());
++
+     return () => {
+       canceled = true;
+     };
+@@ -491,6 +501,10 @@ export function SmartPreferences(): JSX.Element | null {
+     setThemeSetting(value);
+     drop(window.Events.setThemeSetting(value));
+     drop(themeChanged());
++  const onBrandThemeChange = (value: BrandThemeType) => {
++    setBrandTheme(value);
++    drop(window.Events.setBrandTheme(value));
++  };
+   };
+ 
+   // Async IPC for electron configuration, all can be modified
+@@ -751,7 +765,7 @@ export function SmartPreferences(): JSX.Element | null {
+     });
+   const [hasHideMenuBar, onHideMenuBarChange] = createItemsAccess(
+     'hide-menu-bar',
+-    false,
++    true,
+     value => {
+       window.IPC.setAutoHideMenuBar(value);
+       window.IPC.setMenuBarVisibility(!value);
+@@ -1052,6 +1066,7 @@ export function SmartPreferences(): JSX.Element | null {
+         onSpellCheckChange={onSpellCheckChange}
+         onTextFormattingChange={onTextFormattingChange}
+         onThemeChange={onThemeChange}
++        onBrandThemeChange={onBrandThemeChange}
+         onToggleNavTabsCollapse={toggleNavTabsCollapse}
+         onTypingIndicatorsChange={onTypingIndicatorsChange}
+         onUniversalExpireTimerChange={onUniversalExpireTimerChange}
+@@ -1108,6 +1123,7 @@ export function SmartPreferences(): JSX.Element | null {
+         startLocalBackupExport={startLocalBackupExport}
+         startPlaintextExport={startPlaintextExport}
+         theme={theme}
++        brandTheme={brandTheme}
+         themeSetting={themeSetting}
+         universalExpireTimer={universalExpireTimer}
+         validateBackup={validateBackup}
+diff --git a/ts/windows/AppProvider.dom.tsx b/ts/windows/AppProvider.dom.tsx
+index e46e5c7be..1d7d56661 100644
+--- a/ts/windows/AppProvider.dom.tsx
++++ b/ts/windows/AppProvider.dom.tsx
+@@ -1,9 +1,10 @@
+ // Copyright 2026 Signal Messenger, LLC
+ // SPDX-License-Identifier: AGPL-3.0-only
+ import type { FC, ReactNode } from 'react';
+-import { memo, StrictMode } from 'react';
++import { memo, StrictMode, useEffect } from 'react';
+ import { AxoProvider } from '../axo/AxoProvider.dom.tsx';
+ import type { AxoProviderProps } from '../axo/AxoProvider.dom.tsx';
++import { brandThemeClassName } from '../util/theme.std.ts';
+ import type { AxoIntl } from '../axo/_internal/AxoIntl.dom.tsx';
+ import type { LanguageTag } from '@signalapp/types';
+ 
+@@ -13,6 +14,36 @@ export type AppProviderProps = Readonly<{
+ 
+ export const AppProvider: FC<AppProviderProps> = memo(
+   function AppProvider(props) {
++    useEffect(() => {
++      const abortController = new AbortController();
++
++      async function applyBrandTheme() {
++        const brandTheme =
++          (await window.SignalContext.Settings.brandTheme.getValue()) ??
++          'vesper';
++        if (abortController.signal.aborted) {
++          return;
++        }
++        document.body.classList.remove(
++          brandThemeClassName('signal'),
++          brandThemeClassName('vesper')
++        );
++        document.body.classList.add(brandThemeClassName(brandTheme));
++      }
++
++      async function loop() {
++        while (!abortController.signal.aborted) {
++          // oxlint-disable-next-line no-await-in-loop
++          await applyBrandTheme();
++          // oxlint-disable-next-line no-await-in-loop
++          await window.SignalContext.Settings.waitForChange();
++        }
++      }
++
++      void loop();
++      return () => abortController.abort();
++    }, []);
++
+     const { i18n } = window.SignalContext;
+     const locale = window.SignalContext.getResolvedMessagesLocale();
+     const direction = window.SignalContext.getResolvedMessagesLocaleDirection();

@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Fri, 21 Aug 2026 14:28:06 +0000
+Subject: [PATCH 20/22] fix: repair desktop theme integration
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ ts/axo/_tailwind-theme/colors.css      | 3 ++-
+ ts/state/smart/Preferences.preload.tsx | 2 +-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/ts/axo/_tailwind-theme/colors.css b/ts/axo/_tailwind-theme/colors.css
+index edb9c29a0..2e49da492 100644
+--- a/ts/axo/_tailwind-theme/colors.css
++++ b/ts/axo/_tailwind-theme/colors.css
+@@ -531,9 +531,10 @@
+   --axo-color-legacy-warning-badge:            light-dark(#C84118, #EB977D);
+ }
+ 
++/**
+  * Signal palette
+  * ----------------------------------------------------------------------------
+- * Keep Signal's upstream desktop palette available as an appearance choice.
++ * Keep the upstream Signal desktop palette available as an appearance choice.
+  */
+ 
+ /* prettier-ignore */
+diff --git a/ts/state/smart/Preferences.preload.tsx b/ts/state/smart/Preferences.preload.tsx
+index 846bb9ceb..56b2f9471 100644
+--- a/ts/state/smart/Preferences.preload.tsx
++++ b/ts/state/smart/Preferences.preload.tsx
+@@ -501,11 +501,11 @@ export function SmartPreferences(): JSX.Element | null {
+     setThemeSetting(value);
+     drop(window.Events.setThemeSetting(value));
+     drop(themeChanged());
++  };
+   const onBrandThemeChange = (value: BrandThemeType) => {
+     setBrandTheme(value);
+     drop(window.Events.setBrandTheme(value));
+   };
+-  };
+ 
+   // Async IPC for electron configuration, all can be modified
+ 

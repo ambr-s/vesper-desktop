@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:44:33 +0100
-Subject: [PATCH 01/19] Use the Vesper static colour palette
+Subject: [PATCH 01/22] Use the Vesper static colour palette
 
 Apply the Android palette to Desktop's legacy and Axo colour tokens while preserving the existing light, dark, and system theme modes.
 
@@ -9,8 +9,8 @@ Signed-off-by: amber <amber@flourish.ch>
 ---
  app/main.main.ts                  |   6 +-
  stylesheets/_variables.scss       |  20 ++---
- ts/axo/_tailwind-theme/colors.css | 118 +++++++++++++++---------------
- 3 files changed, 72 insertions(+), 72 deletions(-)
+ ts/axo/_tailwind-theme/colors.css | 142 +++++++++++++++---------------
+ 3 files changed, 84 insertions(+), 84 deletions(-)
 
 diff --git a/app/main.main.ts b/app/main.main.ts
 index cfc5bfc70..f8d9665f5 100644
@@ -75,7 +75,7 @@ index 90b3172cd..96231c312 100644
  );
  $color-basil: (
 diff --git a/ts/axo/_tailwind-theme/colors.css b/ts/axo/_tailwind-theme/colors.css
-index 1b27b4fca..4e5974eda 100644
+index 11b13b77e..4982fb3a8 100644
 --- a/ts/axo/_tailwind-theme/colors.css
 +++ b/ts/axo/_tailwind-theme/colors.css
 @@ -19,7 +19,7 @@
@@ -128,7 +128,7 @@ index 1b27b4fca..4e5974eda 100644
      }
    }
  }
-@@ -184,26 +184,26 @@
+@@ -184,12 +184,12 @@
  
  /* prettier-ignore */
  @theme {
@@ -138,17 +138,16 @@ index 1b27b4fca..4e5974eda 100644
 -  --axo-color-surface-quaternary:       light-dark(#e6e6e6, #373737);
 -  --axo-color-surface-card:             light-dark(#ffffff, --alpha(#969696 / 8%));
 -  --axo-color-surface-message-incoming: light-dark(#ebebeb, #323232);
--  --axo-color-surface-message-outgoing: light-dark(#2267f5, #2267f5);
 +  --axo-color-surface-primary:          light-dark(#f6f6ff, #100e1f);
 +  --axo-color-surface-secondary:        light-dark(#f3f0ff, #181137);
 +  --axo-color-surface-tertiary:         light-dark(#eeeaff, #1e1645);
 +  --axo-color-surface-quaternary:       light-dark(#eae5ff, #231a4e);
 +  --axo-color-surface-card:             light-dark(#ffffff, #281e57);
 +  --axo-color-surface-message-incoming: light-dark(#eeeaff, #281e57);
-+  --axo-color-surface-message-outgoing: light-dark(#7152ff, #5335dd);
+   --axo-color-surface-message-outgoing: light-dark(#2267f5, #2267f5);
  }
  
- /* prettier-ignore */
+@@ -197,13 +197,13 @@
  @layer theme {
    @media (prefers-contrast: more) {
      :root {
@@ -162,7 +161,7 @@ index 1b27b4fca..4e5974eda 100644
 +      --axo-color-surface-primary:          light-dark(#f6f6ff, #100e1f);
 +      --axo-color-surface-secondary:        light-dark(#f3f0ff, #181137);
 +      --axo-color-surface-tertiary:         light-dark(#eeeaff, #1e1645);
-+      --axo-color-surface-quaternary:       light-dark(#e5dfff, #281e57);
++      --axo-color-surface-quaternary:       light-dark(#eae5ff, #231a4e);
 +      --axo-color-surface-card:             light-dark(#ffffff, #281e57);
 +      --axo-color-surface-message-incoming: light-dark(#e5dfff, #281e57);
 +      --axo-color-surface-message-outgoing: light-dark(#5335dd, #5335dd);
@@ -180,7 +179,7 @@ index 1b27b4fca..4e5974eda 100644
 -  --axo-color-material-quaternary:         light-dark(--alpha(#e4e4e4 / 90%), --alpha(#353535 / 90%));
 -  --axo-color-material-quaternary-pressed: light-dark(--alpha(#dedede / 90%), --alpha(#3a3a3a / 90%));
 +  --axo-color-material-primary:            light-dark(--alpha(#f6f6ff / 90%), --alpha(#100e1f / 90%));
-+  --axo-color-material-secondary:          light-dark(--alpha(#f3f0ff / 90%), --alpha(#181137 / 90%));
++  --axo-color-material-secondary:          light-dark(--alpha(#f3f0ff / 90%), --alpha(#1f1f1f / 90%));
 +  --axo-color-material-tertiary:           light-dark(--alpha(#eeeaff / 90%), --alpha(#1e1645 / 90%));
 +  --axo-color-material-tertiary-pressed:   light-dark(--alpha(#eae5ff / 90%), --alpha(#231a4e / 90%));
 +  --axo-color-material-quaternary:         light-dark(--alpha(#e5dfff / 90%), --alpha(#281e57 / 90%));
@@ -194,7 +193,7 @@ index 1b27b4fca..4e5974eda 100644
  
 @@ -236,15 +236,15 @@
  @layer theme {
-   @media (prefers-contrast: more) {
+   @media (prefers-contrast: more) or (prefers-reduced-transparency: reduce) {
      :root {
 -      --axo-color-material-primary:            light-dark(#fafafa, #191919);
 -      --axo-color-material-secondary:          light-dark(#f5f5f5, #1e1e1e);
@@ -205,9 +204,9 @@ index 1b27b4fca..4e5974eda 100644
 +      --axo-color-material-primary:            light-dark(#f6f6ff, #100e1f);
 +      --axo-color-material-secondary:          light-dark(#f3f0ff, #181137);
 +      --axo-color-material-tertiary:           light-dark(#eeeaff, #1e1645);
-+      --axo-color-material-tertiary-pressed:   light-dark(#eae5ff, #231a4e);
-+      --axo-color-material-quaternary:         light-dark(#e5dfff, #281e57);
-+      --axo-color-material-quaternary-pressed: light-dark(#ddd5ff, #302461);
++      --axo-color-material-tertiary-pressed:   light-dark(#eeeaff, #2d2d2d);
++      --axo-color-material-quaternary:         light-dark(#eae5ff, #281e57);
++      --axo-color-material-quaternary-pressed: light-dark(#e5dfff, #231a4e);
        --axo-color-material-dim-primary:        light-dark(#4b4b4b, #4b4b4b);
        --axo-color-material-dim-secondary:      light-dark(#737373, #414141);
 -      --axo-color-material-dialog:             light-dark(#fafafa, #323232);
@@ -215,6 +214,58 @@ index 1b27b4fca..4e5974eda 100644
        --axo-color-material-warning:            light-dark(#fff9e0, #443f2c);
      }
    }
+@@ -274,7 +274,7 @@
+   --axo-color-fill-tertiary:          light-dark(--alpha(#7d7d7d / 24%), --alpha(#969696 / 28%));
+   --axo-color-fill-tertiary-pressed:  light-dark(--alpha(#7d7d7d / 28%), --alpha(#969696 / 32%));
+   --axo-color-fill-control:           light-dark(#ffffff, --alpha(#969696 / 12%));
+-  --axo-color-fill-control-pressed:   light-dark(#fafafa, --alpha(#969696 / 16%));
++  --axo-color-fill-control-pressed:   light-dark(#f6f6ff, --alpha(#969696 / 16%));
+   --axo-color-fill-inverted:          light-dark(#414141, #dcdcdc);
+   --axo-color-fill-inverted-pressed:  light-dark(#4b4b4b, #d2d2d2);
+   --axo-color-fill-overlay:           light-dark(--alpha(#000000 / 24%), --alpha(#000000 / 48%));
+@@ -291,9 +291,9 @@
+       --axo-color-fill-tertiary:          light-dark(--alpha(#7d7d7d / 32%), --alpha(#969696 / 36%));
+       --axo-color-fill-tertiary-pressed:  light-dark(--alpha(#7d7d7d / 36%), --alpha(#969696 / 40%));
+       --axo-color-fill-control:           light-dark(--alpha(#969696 / 20%));
+-      --axo-color-fill-control-pressed:   light-dark(#fafafa, --alpha(#969696 / 24%));
+-      --axo-color-fill-inverted:          light-dark(#232323, #ebebeb);
+-      --axo-color-fill-inverted-pressed:  light-dark(#2d2d2d, #e1e1e1);
++      --axo-color-fill-control-pressed:   light-dark(#f6f6ff, --alpha(#969696 / 24%));
++      --axo-color-fill-inverted:          light-dark(#232323, #eeeaff);
++      --axo-color-fill-inverted-pressed:  light-dark(#2d2d2d, #e5dfff);
+       --axo-color-fill-overlay:           light-dark(--alpha(#000000 / 48%), --alpha(#000000 / 64%));
+     }
+   }
+@@ -306,10 +306,10 @@
+ 
+ /* prettier-ignore */
+ @theme {
+-  --axo-color-fill-onmessage-incoming-primary:           light-dark(--alpha(#fefefe / 80%), --alpha(#e6e6e6 / 16%));
+-  --axo-color-fill-onmessage-incoming-primary-pressed:   light-dark(--alpha(#fefefe / 60%), --alpha(#e6e6e6 / 20%));
+-  --axo-color-fill-onmessage-incoming-secondary:         light-dark(--alpha(#fefefe / 60%), --alpha(#e6e6e6 / 12%));
+-  --axo-color-fill-onmessage-incoming-secondary-pressed: light-dark(--alpha(#fefefe / 36%), --alpha(#e6e6e6 / 16%));
++  --axo-color-fill-onmessage-incoming-primary:           light-dark(--alpha(#fefefe / 80%), --alpha(#eae5ff / 16%));
++  --axo-color-fill-onmessage-incoming-primary-pressed:   light-dark(--alpha(#fefefe / 60%), --alpha(#eae5ff / 20%));
++  --axo-color-fill-onmessage-incoming-secondary:         light-dark(--alpha(#fefefe / 60%), --alpha(#eae5ff / 12%));
++  --axo-color-fill-onmessage-incoming-secondary-pressed: light-dark(--alpha(#fefefe / 36%), --alpha(#eae5ff / 16%));
+   --axo-color-fill-onmessage-outgoing-primary:           light-dark(--alpha(#ffffff / 20%), --alpha(#ffffff / 20%));
+   --axo-color-fill-onmessage-outgoing-primary-pressed:   light-dark(--alpha(#ffffff / 16%), --alpha(#ffffff / 24%));
+   --axo-color-fill-onmessage-outgoing-secondary:         light-dark(--alpha(#ffffff / 60%), --alpha(#ffffff / 52%));
+@@ -320,10 +320,10 @@
+ @layer theme {
+   @media (prefers-contrast: more) {
+     :root {
+-      --axo-color-fill-onmessage-incoming-primary:           light-dark(--alpha(#fefefe / 80%), --alpha(#e6e6e6 / 16%));
+-      --axo-color-fill-onmessage-incoming-primary-pressed:   light-dark(--alpha(#fefefe / 60%), --alpha(#e6e6e6 / 20%));
+-      --axo-color-fill-onmessage-incoming-secondary:         light-dark(--alpha(#fefefe / 64%), --alpha(#e6e6e6 / 12%));
+-      --axo-color-fill-onmessage-incoming-secondary-pressed: light-dark(--alpha(#fefefe / 52%), --alpha(#e6e6e6 / 16%));
++      --axo-color-fill-onmessage-incoming-primary:           light-dark(--alpha(#fefefe / 80%), --alpha(#eae5ff / 16%));
++      --axo-color-fill-onmessage-incoming-primary-pressed:   light-dark(--alpha(#fefefe / 60%), --alpha(#eae5ff / 20%));
++      --axo-color-fill-onmessage-incoming-secondary:         light-dark(--alpha(#fefefe / 64%), --alpha(#eae5ff / 12%));
++      --axo-color-fill-onmessage-incoming-secondary-pressed: light-dark(--alpha(#fefefe / 52%), --alpha(#eae5ff / 16%));
+       --axo-color-fill-onmessage-outgoing-primary:           light-dark(--alpha(#ffffff / 20%), --alpha(#ffffff / 20%));
+       --axo-color-fill-onmessage-outgoing-primary-pressed:   light-dark(--alpha(#ffffff / 16%), --alpha(#ffffff / 24%));
+       --axo-color-fill-onmessage-outgoing-secondary:         light-dark(--alpha(#ffffff / 68%), --alpha(#ffffff / 64%));
 @@ -339,12 +339,12 @@
  
  /* prettier-ignore */
@@ -234,7 +285,7 @@ index 1b27b4fca..4e5974eda 100644
  
    --axo-color-fill-affirmative:                light-dark(#09a523, #07ab23);
    --axo-color-fill-affirmative-pressed:        light-dark(#089b21, #08b525);
-@@ -363,10 +363,10 @@
+@@ -363,25 +363,25 @@
    --axo-color-fill-safety-tint:                light-dark(--alpha(#b95929 / 12%), --alpha(#eb977d / 16%));
    --axo-color-fill-safety-tint-pressed:        light-dark(--alpha(#b95929 / 16%), --alpha(#eb977d / 20%));
  
@@ -248,8 +299,11 @@ index 1b27b4fca..4e5974eda 100644
 +  --axo-color-fill-destructive-tint-pressed:   light-dark(--alpha(#e00052 / 10%), --alpha(#fe006e / 16%));
  
    --axo-color-fill-white:                      light-dark(#ffffff, #ffffff);
-   --axo-color-fill-white-pressed:              light-dark(#fafafa, #fafafa);
-@@ -376,12 +376,12 @@
+-  --axo-color-fill-white-pressed:              light-dark(#fafafa, #fafafa);
++  --axo-color-fill-white-pressed:              light-dark(#f6f6ff, #f6f6ff);
+ }
+ 
+ /* prettier-ignore */
  @layer theme {
    @media (prefers-contrast: more) {
      :root {
@@ -268,36 +322,38 @@ index 1b27b4fca..4e5974eda 100644
  
        --axo-color-fill-affirmative:                light-dark(#007514, #007514);
        --axo-color-fill-affirmative-pressed:        light-dark(#006b12, #008016);
-@@ -400,10 +400,10 @@
-       --axo-color-fill-safety-tint:                light-dark(--alpha(#b95929 / 12%), --alpha(#eb977d / 16%));
-       --axo-color-fill-safety-tint-pressed:        light-dark(--alpha(#b95929 / 16%), --alpha(#eb977d / 20%));
+@@ -402,11 +402,11 @@
  
--      --axo-color-fill-destructive:                light-dark(#b80c00, #b80c00);
--      --axo-color-fill-destructive-pressed:        light-dark(#a80b00, #c20d00);
+       --axo-color-fill-destructive:                light-dark(#b80c00, #b80c00);
+       --axo-color-fill-destructive-pressed:        light-dark(#a80b00, #c20d00);
 -      --axo-color-fill-destructive-tint:           light-dark(--alpha(#d91304 / 12%), --alpha(#ff4a3a / 20%));
 -      --axo-color-fill-destructive-tint-pressed:   light-dark(--alpha(#d91304 / 16%), --alpha(#ff4a3a / 24%));
-+      --axo-color-fill-destructive:                light-dark(#a0003b, #fe006e);
-+      --axo-color-fill-destructive-pressed:        light-dark(#890033, #e90065);
-+      --axo-color-fill-destructive-tint:           light-dark(--alpha(#e00052 / 12%), --alpha(#fe006e / 20%));
-+      --axo-color-fill-destructive-tint-pressed:   light-dark(--alpha(#e00052 / 16%), --alpha(#fe006e / 24%));
++      --axo-color-fill-destructive-tint:           light-dark(--alpha(#d91304 / 12%), --alpha(#fe006e / 20%));
++      --axo-color-fill-destructive-tint-pressed:   light-dark(--alpha(#d91304 / 16%), --alpha(#fe006e / 24%));
  
        --axo-color-fill-white:                      light-dark(#ffffff, #ffffff);
-       --axo-color-fill-white-pressed:              light-dark(#fafafa, #fafafa);
-@@ -467,7 +467,7 @@
+-      --axo-color-fill-white-pressed:              light-dark(#fafafa, #fafafa);
++      --axo-color-fill-white-pressed:              light-dark(#f6f6ff, #f6f6ff);
+     }
+   }
+ }
+@@ -467,8 +467,8 @@
    --axo-color-border-primary:               light-dark(--alpha(#000000 / 6%), --alpha(#ffffff / 6%));
    --axo-color-border-secondary:             light-dark(--alpha(#000000 / 10%), --alpha(#ffffff / 10%));
    --axo-color-border-tertiary:              light-dark(--alpha(#000000 / 24%), --alpha(#ffffff / 24%));
 -  --axo-color-border-selected:              light-dark(#4655ff, #c9ceff);
-+  --axo-color-border-selected:              light-dark(#7152ff, #c8bdff);
-   --axo-color-border-selected-oncolor:      light-dark(#fafafa, #fafafa);
+-  --axo-color-border-selected-oncolor:      light-dark(#fafafa, #fafafa);
++  --axo-color-border-selected:              light-dark(#7152ff, #c9ceff);
++  --axo-color-border-selected-oncolor:      light-dark(#f6f6ff, #f6f6ff);
    --axo-color-border-focused-inner:         light-dark(#ffffff, #000000);
    --axo-color-border-focused-outer:         light-dark(#808190, #c9cbda);
-@@ -482,7 +482,7 @@
-       --axo-color-border-primary:               light-dark(--alpha(#000000 / 24%), --alpha(#ffffff / 24%));
+   --axo-color-border-focused-inner-oncolor: light-dark(#000000, #000000);
+@@ -483,7 +483,7 @@
        --axo-color-border-secondary:             light-dark(--alpha(#000000 / 32%), --alpha(#ffffff / 32%));
        --axo-color-border-tertiary:              light-dark(--alpha(#000000 / 70%), --alpha(#ffffff / 70%));
--      --axo-color-border-selected:              light-dark(#3243ff, #c9ceff);
-+      --axo-color-border-selected:              light-dark(#5335dd, #c8bdff);
-       --axo-color-border-selected-oncolor:      light-dark(#fafafa, #fafafa);
+       --axo-color-border-selected:              light-dark(#3243ff, #c9ceff);
+-      --axo-color-border-selected-oncolor:      light-dark(#fafafa, #fafafa);
++      --axo-color-border-selected-oncolor:      light-dark(#f6f6ff, #f6f6ff);
        --axo-color-border-focused-inner:         light-dark(#ffffff, #000000);
        --axo-color-border-focused-outer:         light-dark(#67697e, #e4e5f0);
+       --axo-color-border-focused-inner-oncolor: light-dark(#000000, #000000);

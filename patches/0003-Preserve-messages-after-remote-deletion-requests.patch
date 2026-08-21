@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 25 Jul 2026 18:54:15 +0100
-Subject: [PATCH 03/19] Preserve messages after remote deletion requests
+Subject: [PATCH 03/22] Preserve messages after remote deletion requests
 
 Add an opt-in privacy setting that keeps ordinary incoming chat messages when their sender deletes them for everyone. Administrator deletions, stories, and our own outgoing messages continue to use Signal's standard deletion path.
 

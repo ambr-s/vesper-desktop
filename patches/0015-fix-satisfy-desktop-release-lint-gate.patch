@@ -1,9 +1,9 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
-Date: Mon, 27 Jul 2026 16:29:51 +0100
-Subject: [PATCH 15/19] feat: load shared Vesper account configuration
+Date: Mon, 27 Jul 2026 16:36:40 +0100
+Subject: [PATCH 15/22] fix: satisfy desktop release lint gate
 
-Cache and refresh the per-account Vesper config outside startup, apply account-specific flag overrides, and derive developer identity only from the hashed remote list. Show that verified identity throughout contact surfaces and on the contact information card. Also finish deletion-pill layout and Vesper-owned source attribution fixes.
+Use Vesper-owned copyright headers accepted by the fork lint rules, give DOM-dependent developer helpers accurate suffixes, and resolve strict lint findings without making config refresh block startup.
 
 Signed-off-by: amber <amber@flourish.ch>
 ---
@@ -49,22 +49,20 @@ Signed-off-by: amber <amber@flourish.ch>
  ts/state/selectors/message.preload.ts         |  13 +-
  ts/test-node/VesperConfig_test.dom.ts         | 127 +++++++++
  ts/test-node/util/isVesperAuthor_test.std.ts  |  42 ++-
- .../util/vesperDeleteForEveryone_test.std.ts  |  39 ++-
- ts/test-node/util/vesperProtocol_test.std.ts  |   2 +-
+ .../util/vesperDeleteForEveryone_test.std.ts  |  37 ++-
  ts/types/StorageKeys.std.ts                   |   7 +
  ts/types/Stories.std.ts                       |   1 +
  ts/util/isVesperAuthor.std.ts                 |   7 +-
- ts/util/vesperDeleteForEveryone.std.ts        |  17 +-
- ts/util/vesperProtocol.std.ts                 |   2 +-
- 49 files changed, 834 insertions(+), 153 deletions(-)
+ ts/util/vesperDeleteForEveryone.std.ts        |  15 ++
+ 47 files changed, 830 insertions(+), 149 deletions(-)
  create mode 100644 ts/VesperConfig.dom.ts
  create mode 100644 ts/test-node/VesperConfig_test.dom.ts
 
 diff --git a/_locales/en/messages.json b/_locales/en/messages.json
-index 14704e327..7224358b9 100644
+index d6a0eb3d2..f976a01d8 100644
 --- a/_locales/en/messages.json
 +++ b/_locales/en/messages.json
-@@ -8992,6 +8992,10 @@
+@@ -9044,6 +9044,10 @@
      "messageformat": "Deletion requested",
      "description": "Local-only label shown on a message that Vesper kept after a remote deletion request"
    },
@@ -76,7 +74,7 @@ index 14704e327..7224358b9 100644
      "messageformat": "Update to version {version} available",
      "description": "Tooltip for new update available"
 diff --git a/stylesheets/_modules.scss b/stylesheets/_modules.scss
-index 8f4a9e8a0..f75e7438b 100644
+index 9cd4b6590..9ec946d0c 100644
 --- a/stylesheets/_modules.scss
 +++ b/stylesheets/_modules.scss
 @@ -1738,6 +1738,11 @@ $message-padding-horizontal: 12px;
@@ -120,7 +118,7 @@ index e03009bca..d7f0b57e1 100644
  
  @use 'sass:color';
 diff --git a/stylesheets/components/VesperTitleBar.scss b/stylesheets/components/VesperTitleBar.scss
-index c0c7175f0..a230d3e8b 100644
+index 717a84bb5..9794f5079 100644
 --- a/stylesheets/components/VesperTitleBar.scss
 +++ b/stylesheets/components/VesperTitleBar.scss
 @@ -1,4 +1,4 @@
@@ -130,7 +128,7 @@ index c0c7175f0..a230d3e8b 100644
  
  .VesperTitleBar {
 diff --git a/ts/RemoteConfig.dom.ts b/ts/RemoteConfig.dom.ts
-index 1710ab1bf..3fb9a6f73 100644
+index e98f0c70e..428e73aac 100644
 --- a/ts/RemoteConfig.dom.ts
 +++ b/ts/RemoteConfig.dom.ts
 @@ -23,6 +23,7 @@ import type {
@@ -141,7 +139,7 @@ index 1710ab1bf..3fb9a6f73 100644
  
  const { get, throttle } = lodash;
  
-@@ -366,6 +367,12 @@ export function isEnabled(
+@@ -367,6 +368,12 @@ export function isEnabled(
      reduxConfig != null || config != null,
      'getValue called before remote config is ready'
    );
@@ -154,7 +152,7 @@ index 1710ab1bf..3fb9a6f73 100644
    return get(reduxConfig ?? config, [name, 'enabled'], false);
  }
  
-@@ -377,6 +384,16 @@ export function getValue(
+@@ -378,6 +385,16 @@ export function getValue(
      reduxConfig != null || config != null,
      'getValue called before remote config is ready'
    );
@@ -425,10 +423,10 @@ index 000000000..4ac3c91db
 +  return 'updated';
 +}
 diff --git a/ts/background.preload.ts b/ts/background.preload.ts
-index 65ca429f8..4bf7fa4ef 100644
+index 565cf5ce8..9bb540cd7 100644
 --- a/ts/background.preload.ts
 +++ b/ts/background.preload.ts
-@@ -259,6 +259,10 @@ import {
+@@ -260,6 +260,10 @@ import {
    maybeRefreshRemoteConfig,
    forceRefreshRemoteConfig,
  } from './RemoteConfig.dom.ts';
@@ -439,7 +437,7 @@ index 65ca429f8..4bf7fa4ef 100644
  import {
    getParametersForRedux,
    loadAll,
-@@ -559,9 +563,24 @@ async function startApp(): Promise<void> {
+@@ -562,9 +566,24 @@ async function startApp(): Promise<void> {
      }
      first = false;
  
@@ -731,7 +729,7 @@ index 86b6257da..b9340a568 100644
                />
              </div>
 diff --git a/ts/components/VesperTitleBar.dom.tsx b/ts/components/VesperTitleBar.dom.tsx
-index c5ed30928..e23bf8af4 100644
+index 5215e2245..37915761a 100644
 --- a/ts/components/VesperTitleBar.dom.tsx
 +++ b/ts/components/VesperTitleBar.dom.tsx
 @@ -1,4 +1,4 @@
@@ -831,7 +829,7 @@ index c94bbfdfb..96feaa005 100644
        <p>
          {kind === 'invited' && (
 diff --git a/ts/components/conversation/Message.dom.tsx b/ts/components/conversation/Message.dom.tsx
-index f3b2df3c9..4243dcf19 100644
+index d3522100c..ea8bbf234 100644
 --- a/ts/components/conversation/Message.dom.tsx
 +++ b/ts/components/conversation/Message.dom.tsx
 @@ -87,6 +87,7 @@ import {
@@ -1847,13 +1845,10 @@ index 78574c19c..4aefbc2de 100644
  
    it('returns false for other identifiers', () => {
 diff --git a/ts/test-node/util/vesperDeleteForEveryone_test.std.ts b/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
-index 6c2f77ffe..62e2d0e2f 100644
+index 22a6bea4f..1f89aa53e 100644
 --- a/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
 +++ b/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
-@@ -1,9 +1,12 @@
--// Copyright 2026 Signal Messenger, LLC
-+// Copyright 2026 Vesper contributors
- // SPDX-License-Identifier: AGPL-3.0-only
+@@ -3,7 +3,10 @@
  
  import { assert } from 'chai';
  
@@ -1901,18 +1896,8 @@ index 6c2f77ffe..62e2d0e2f 100644
 +    );
 +  });
 +});
-diff --git a/ts/test-node/util/vesperProtocol_test.std.ts b/ts/test-node/util/vesperProtocol_test.std.ts
-index 779e5ab3f..3423e7b92 100644
---- a/ts/test-node/util/vesperProtocol_test.std.ts
-+++ b/ts/test-node/util/vesperProtocol_test.std.ts
-@@ -1,4 +1,4 @@
--// Copyright 2026 Signal Messenger, LLC
-+// Copyright 2026 Vesper contributors
- // SPDX-License-Identifier: AGPL-3.0-only
- 
- import { assert } from 'chai';
 diff --git a/ts/types/StorageKeys.std.ts b/ts/types/StorageKeys.std.ts
-index ad4ef44ef..ce26004be 100644
+index 26211cb20..0dd5cee51 100644
 --- a/ts/types/StorageKeys.std.ts
 +++ b/ts/types/StorageKeys.std.ts
 @@ -9,6 +9,7 @@ import type {
@@ -1923,7 +1908,7 @@ index ad4ef44ef..ce26004be 100644
  import type { ExtendedStorageID, UnknownRecord } from './StorageService.d.ts';
  
  import type { GroupCredentialType } from '../textsecure/WebAPI.preload.ts';
-@@ -159,6 +160,9 @@ export type StorageAccessType = {
+@@ -174,6 +175,9 @@ export type StorageAccessType = {
    'preferred-audio-output-device': AudioDevice | undefined;
    remoteConfig: RemoteConfigType;
    remoteConfigHash: string;
@@ -1933,7 +1918,7 @@ index ad4ef44ef..ce26004be 100644
    serverTimeSkew: number;
    unidentifiedDeliveryIndicators: boolean;
    groupCredentials: ReadonlyArray<GroupCredentialType>;
-@@ -489,6 +493,9 @@ const STORAGE_KEYS_TO_REMOVE_AFTER_UNLINK = [
+@@ -511,6 +515,9 @@ const STORAGE_KEYS_TO_REMOVE_AFTER_UNLINK = [
    'storage-service-pending-deletes',
    'remoteConfig',
    'remoteConfigHash',
@@ -1978,15 +1963,9 @@ index bf334fb41..cfc9c50d9 100644
 +  return isVesperDeveloper({ serviceId });
  }
 diff --git a/ts/util/vesperDeleteForEveryone.std.ts b/ts/util/vesperDeleteForEveryone.std.ts
-index e6074a3f0..7d611b62f 100644
+index b17bbcfa3..ad7629641 100644
 --- a/ts/util/vesperDeleteForEveryone.std.ts
 +++ b/ts/util/vesperDeleteForEveryone.std.ts
-@@ -1,4 +1,4 @@
--// Copyright 2026 Signal Messenger, LLC
-+// Copyright 2026 Vesper contributors
- // SPDX-License-Identifier: AGPL-3.0-only
- 
- export function shouldKeepDeletedMessage({
 @@ -14,3 +14,18 @@ export function shouldKeepDeletedMessage({
  }>): boolean {
    return keepDeletedMessages && isIncoming && !isAdminDelete && !isStory;
@@ -2006,13 +1985,3 @@ index e6074a3f0..7d611b62f 100644
 +    fullPillWidth + adjacentContentWidth >= messageBubbleWidth - 5
 +  );
 +}
-diff --git a/ts/util/vesperProtocol.std.ts b/ts/util/vesperProtocol.std.ts
-index 486a7d26c..7bfe161da 100644
---- a/ts/util/vesperProtocol.std.ts
-+++ b/ts/util/vesperProtocol.std.ts
-@@ -1,4 +1,4 @@
--// Copyright 2026 Signal Messenger, LLC
-+// Copyright 2026 Vesper contributors
- // SPDX-License-Identifier: AGPL-3.0-only
- 
- const VESPER_PROTOCOL_SCHEME = 'vesper';
