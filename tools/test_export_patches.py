@@ -209,6 +209,68 @@ class StablePatchExportTest(unittest.TestCase):
         self.assertNotEqual(original_bytes, updated_bytes)
         self.assertIn(b"Updated provenance and attribution.", updated_bytes)
 
+    def test_matches_provenance_when_git_author_day_is_single_digit(self) -> None:
+        exporter = load_exporter()
+        run(
+            "git",
+            "commit",
+            "--amend",
+            "-q",
+            "-m",
+            "feat: add Vesper behaviour",
+            "--date=Wed, 9 Sep 2026 12:34:56 +0000",
+            cwd=self.repository,
+        )
+        exporter.export_patch_series(self.repository, self.output, self.base, [])
+        patch = next(self.output.glob("*.patch")).read_bytes()
+
+        self.assertIn(b"Date: Wed, 9 Sep 2026 12:34:56 +0000", patch)
+        self.assertTrue(exporter.matches_commit_provenance(patch, self.repository, "HEAD"))
+
+    def test_rejects_patch_when_author_instants_differ(self) -> None:
+        exporter = load_exporter()
+        run(
+            "git",
+            "commit",
+            "--amend",
+            "-q",
+            "-m",
+            "feat: add Vesper behaviour",
+            "--date=Wed, 9 Sep 2026 12:34:56 +0000",
+            cwd=self.repository,
+        )
+        exporter.export_patch_series(self.repository, self.output, self.base, [])
+        original_bytes = next(self.output.glob("*.patch")).read_bytes()
+
+        run(
+            "git",
+            "commit",
+            "--amend",
+            "-q",
+            "-m",
+            "feat: add Vesper behaviour",
+            "--date=Wed, 9 Sep 2026 12:34:57 +0000",
+            cwd=self.repository,
+        )
+        self.assertFalse(
+            exporter.matches_commit_provenance(original_bytes, self.repository, "HEAD")
+        )
+
+    def test_rejects_patch_with_invalid_author_date(self) -> None:
+        exporter = load_exporter()
+        exporter.export_patch_series(self.repository, self.output, self.base, [])
+        patch_path = next(self.output.glob("*.patch"))
+        invalid_bytes = patch_path.read_bytes().replace(
+            b"Date: ", b"Date: not-a-date\nX-Original-Date: ", 1
+        )
+        patch_path.write_bytes(invalid_bytes)
+
+        self.assertFalse(
+            exporter.matches_commit_provenance(invalid_bytes, self.repository, "HEAD")
+        )
+        exporter.export_patch_series(self.repository, self.output, self.base, [])
+        self.assertNotEqual(invalid_bytes, patch_path.read_bytes())
+
     def test_disables_configured_cover_letters(self) -> None:
         exporter = load_exporter()
         (self.repository / "second.txt").write_text("second feature\n")
