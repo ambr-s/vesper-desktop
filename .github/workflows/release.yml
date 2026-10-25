@@ -60,6 +60,9 @@ jobs:
         with:
           node-version-file: work/.nvmrc
 
+      - name: Test release signing gate
+        run: python3 tools/test_release_signing.py -v
+
       - name: Verify release identity
         run: node tools/verify-identity.mjs --release work
 
@@ -74,7 +77,13 @@ jobs:
             exit 1
           fi
           git rev-parse --verify "refs/tags/$tag^{tag}" >/dev/null
-          git verify-tag "$tag"
+          # Pin release authority; Git auto-detects signature formats, so also
+          # reject OpenPGP/X.509 rather than inheriting the runner's keyrings.
+          git -c gpg.format=ssh \
+            -c gpg.openpgp.program=/bin/false \
+            -c gpg.x509.program=/bin/false \
+            -c gpg.ssh.allowedSignersFile="$PWD/.github/release-signers" \
+            verify-tag "$tag"
           tag_commit="$(git rev-parse "$tag^{commit}")"
           head_commit="$(git rev-parse HEAD)"
           if [[ "$tag_commit" != "$head_commit" ]]; then
@@ -128,8 +137,11 @@ jobs:
         run: |
           sudo apt-get install -y \
             apt-utils \
+            dbus-daemon \
             flatpak \
             flatpak-builder \
+            gnome-keyring \
+            libglib2.0-bin \
             gnupg \
             libpulse0 \
             xvfb ||
@@ -137,8 +149,11 @@ jobs:
               sudo apt-get update &&
               sudo apt-get install -y \
                 apt-utils \
+                dbus-daemon \
                 flatpak \
                 flatpak-builder \
+                gnome-keyring \
+                libglib2.0-bin \
                 gnupg \
                 libpulse0 \
                 xvfb
@@ -281,6 +296,8 @@ jobs:
     permissions:
       contents: write
     env:
+      # This job downloads artifacts without checking out a Git repository.
+      GH_REPO: ${{ github.repository }}
       R2_BUCKET: vesper-desktop-updates
 
     steps:

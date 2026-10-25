@@ -1,0 +1,5 @@
+# Copyright 2026 Vesper contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# Release authority: freya@hermes; SSH signing only, Git namespace only.
+# SHA256:EF3gGPsqYeFgL3uLafFv3ScSLFcq0bE3HxPpPgWuzSM
+vesper-release namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINpMhJ7bXnqiigAncLoPoobt28tR07u/fqUB6fyRO+cC
