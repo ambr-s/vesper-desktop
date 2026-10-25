@@ -54,7 +54,7 @@ done < <(
     -print0
 )
 
-mkdir -p "$ROOT/patches"
+PATCH_DIR="$(python3 "$ROOT/tools/patch_series.py" "$ROOT" --work "$WORK" "$TRANSFORM_COMMIT")"
 
 mapfile -t FEATURE_COMMITS < <(
   git -C "$WORK" rev-list --reverse "$OVERLAY_COMMIT..HEAD"
@@ -76,7 +76,7 @@ done
 
 EXPORT_ARGS=(
   --work "$WORK"
-  --output "$ROOT/patches"
+  --output "$PATCH_DIR"
   --base "$OVERLAY_COMMIT"
 )
 for relative_path in "${OVERLAY_EXCLUDES[@]}"; do

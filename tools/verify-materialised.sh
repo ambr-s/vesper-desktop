@@ -36,8 +36,9 @@ OVERLAY_COMMIT="$(
 git -C "$WORK" merge-base --is-ancestor "$TRANSFORM_COMMIT" "$OVERLAY_COMMIT"
 git -C "$WORK" merge-base --is-ancestor "$OVERLAY_COMMIT" HEAD
 
+PATCH_DIR="$(python3 "$ROOT/tools/patch_series.py" "$ROOT" --work "$WORK" "$TRANSFORM_COMMIT")"
 mapfile -t PATCHES < <(
-  find "$ROOT/patches" -maxdepth 1 -type f -name '*.patch' -print | sort
+  find "$PATCH_DIR" -maxdepth 1 -type f -name '*.patch' -print | sort
 )
 mapfile -t FEATURE_COMMITS < <(
   git -C "$WORK" rev-list --reverse "$OVERLAY_COMMIT..HEAD"

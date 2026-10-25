@@ -117,7 +117,8 @@ GIT_AUTHOR_DATE="$MATERIALIZE_DATE" GIT_COMMITTER_DATE="$MATERIALIZE_DATE" \
     commit --allow-empty -m "Vesper owned overlays"
 
 shopt -s nullglob
-PATCHES=("$ROOT"/patches/*.patch)
+PATCH_DIR="$(python3 "$ROOT/tools/patch_series.py" "$ROOT" "$TAG")"
+PATCHES=("$PATCH_DIR"/*.patch)
 if ((${#PATCHES[@]})); then
   # Stable exports retain old patch bytes only after proving direct application
   # produces the exact rebased tree. Avoid --3way because filtered clones may

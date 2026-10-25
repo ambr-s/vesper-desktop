@@ -19,9 +19,19 @@ concurrency:
 
 jobs:
   linux:
-    name: Linux x64
+    name: ${{ matrix.name }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            target: pinned
+            tag: ""
+          - name: Linux x64 (Signal v8.32.0 candidate)
+            target: signal-8.32.0
+            tag: v8.32.0
 
     steps:
       - name: Check out Vesper patchset
@@ -30,11 +40,19 @@ jobs:
       - name: Validate patch tooling
         run: |
           python3 tools/test_export_patches.py -v
-          python3 -m py_compile tools/export_patches.py tools/test_export_patches.py
-          bash -n tools/export.sh tools/materialize.sh
+          python3 tools/test_patch_series.py -v
+          python3 -m py_compile tools/export_patches.py tools/test_export_patches.py tools/patch_series.py tools/test_patch_series.py tools/test_chat_refresh_identity.py
+          bash -n tools/export.sh tools/materialize.sh tools/verify-materialised.sh
 
       - name: Materialise Vesper
-        run: ./tools/materialize.sh
+        env:
+          CANDIDATE_TAG: ${{ matrix.tag }}
+        run: |
+          if [[ -n "$CANDIDATE_TAG" ]]; then
+            ./tools/materialize.sh --tag "$CANDIDATE_TAG"
+          else
+            ./tools/materialize.sh
+          fi
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v6
@@ -87,7 +105,7 @@ jobs:
       - name: Upload Linux packages
         uses: actions/upload-artifact@v7
         with:
-          name: vesper-desktop-linux-x64
+          name: vesper-desktop-linux-x64-${{ matrix.target }}
           path: |
             work/release/vesper-desktop_*_amd64.deb
             work/release/vesper-desktop_*_x86_64.AppImage

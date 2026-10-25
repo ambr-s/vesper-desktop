@@ -1,0 +1,243 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sun, 25 Oct 2026 21:32:29 +0000
+Subject: [PATCH 23/24] fix: adapt Vesper integrations to Signal Desktop v8.32
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ stylesheets/_mixins.scss                      | 32 +++++++++----------
+ ts/axo/_tailwind-theme/colors.css             |  1 -
+ ts/components/Preferences.dom.tsx             | 13 ++++++--
+ ts/components/VesperTitleBar.dom.tsx          |  4 ++-
+ .../conversation/AboutContactModal.dom.tsx    |  7 +++-
+ ts/components/conversation/Message.dom.tsx    | 12 +++++--
+ .../conversation/MessageDetail.dom.tsx        |  4 ++-
+ ts/state/smart/Preferences.preload.tsx        |  4 +--
+ ts/test-node/app/menu_test.node.ts            |  2 +-
+ ts/windows/applyTheme.dom.ts                  |  2 --
+ 10 files changed, 51 insertions(+), 30 deletions(-)
+
+diff --git a/stylesheets/_mixins.scss b/stylesheets/_mixins.scss
+index d76491548..d7d76db60 100644
+--- a/stylesheets/_mixins.scss
++++ b/stylesheets/_mixins.scss
+@@ -421,35 +421,35 @@ $rtl-icon-map: (
+ 
+   &:hover {
+     @include light-theme {
+-      background-color: color.mix(
+-        variables.$color-black,
+-        variables.$color-ultramarine,
+-        15%
++      background-color: color-mix(
++        in srgb,
++        variables.$color-black 15%,
++        variables.$color-ultramarine
+       );
+     }
+ 
+     @include dark-theme {
+-      background-color: color.mix(
+-        variables.$color-white,
+-        variables.$color-ultramarine,
+-        15%
++      background-color: color-mix(
++        in srgb,
++        variables.$color-white 15%,
++        variables.$color-ultramarine
+       );
+     }
+   }
+ 
+   &:active {
+     @include light-theme {
+-      background-color: color.mix(
+-        variables.$color-black,
+-        variables.$color-ultramarine,
+-        25%
++      background-color: color-mix(
++        in srgb,
++        variables.$color-black 25%,
++        variables.$color-ultramarine
+       );
+     }
+     @include dark-theme {
+-      background-color: color.mix(
+-        variables.$color-white,
+-        variables.$color-ultramarine,
+-        25%
++      background-color: color-mix(
++        in srgb,
++        variables.$color-white 25%,
++        variables.$color-ultramarine
+       );
+     }
+   }
+diff --git a/ts/axo/_tailwind-theme/colors.css b/ts/axo/_tailwind-theme/colors.css
+index c1cc6061a..8ac4ccae2 100644
+--- a/ts/axo/_tailwind-theme/colors.css
++++ b/ts/axo/_tailwind-theme/colors.css
+@@ -530,7 +530,6 @@
+   --axo-color-legacy-signal-chat-message-bg:   light-dark(#8889B4, #444664);
+ }
+ 
+-
+ /**
+  * Signal palette
+  * ----------------------------------------------------------------------------
+diff --git a/ts/components/Preferences.dom.tsx b/ts/components/Preferences.dom.tsx
+index d78707b06..2c48b1397 100644
+--- a/ts/components/Preferences.dom.tsx
++++ b/ts/components/Preferences.dom.tsx
+@@ -706,7 +706,8 @@ export function Preferences({
+   const [confirmResetNotifications, setConfirmResetNotifications] =
+     useState(false);
+   const [confirmDebugLoggingOff, setConfirmDebugLoggingOff] = useState(false);
+-  const [confirmKeepDeletedMessages, setConfirmKeepDeletedMessages] = useState(false);
++  const [confirmKeepDeletedMessages, setConfirmKeepDeletedMessages] =
++    useState(false);
+   const [showSyncFailed, setShowSyncFailed] = useState(false);
+   const [nowSyncing, setNowSyncing] = useState(false);
+   const [showDisappearingTimerDialog, setShowDisappearingTimerDialog] =
+@@ -1415,8 +1416,14 @@ export function Preferences({
+             value={brandTheme ?? 'vesper'}
+             onValueChange={value => onBrandThemeChange(value as BrandThemeType)}
+             options={[
+-              { label: i18n('icu:Preferences--colour-palette-vesper'), value: 'vesper' },
+-              { label: i18n('icu:Preferences--colour-palette-signal'), value: 'signal' },
++              {
++                label: i18n('icu:Preferences--colour-palette-vesper'),
++                value: 'vesper',
++              },
++              {
++                label: i18n('icu:Preferences--colour-palette-signal'),
++                value: 'signal',
++              },
+             ]}
+           />
+           <AxoSelectItem.Root
+diff --git a/ts/components/VesperTitleBar.dom.tsx b/ts/components/VesperTitleBar.dom.tsx
+index 1f3f84882..756b0c6bf 100644
+--- a/ts/components/VesperTitleBar.dom.tsx
++++ b/ts/components/VesperTitleBar.dom.tsx
+@@ -96,9 +96,11 @@ export function VesperTitleBar({ isMaximized }: PropsType): JSX.Element {
+     setOpenMenuIndex(item.index);
+     try {
+       await window.IPC.popupTitleBarMenu(item.index, rect.left, rect.bottom);
+-    } finally {
++    } catch (error) {
+       setOpenMenuIndex(undefined);
++      throw error;
+     }
++    setOpenMenuIndex(undefined);
+   };
+ 
+   return (
+diff --git a/ts/components/conversation/AboutContactModal.dom.tsx b/ts/components/conversation/AboutContactModal.dom.tsx
+index fc01b1765..1c6b7e81e 100644
+--- a/ts/components/conversation/AboutContactModal.dom.tsx
++++ b/ts/components/conversation/AboutContactModal.dom.tsx
+@@ -265,7 +265,12 @@ export function AboutContactModal({
+ 
+                   {showVesperDeveloper && (
+                     <AxoTextItem.Root
+-                      label={<><OfficialChatInlineBadge /> {i18n('icu:Vesper__AboutContactModal__Developer')}</>}
++                      label={
++                        <>
++                          <OfficialChatInlineBadge />{' '}
++                          {i18n('icu:Vesper__AboutContactModal__Developer')}
++                        </>
++                      }
+                     />
+                   )}
+                   {!isMe && !fromOrAddedByTrustedContact && (
+diff --git a/ts/components/conversation/Message.dom.tsx b/ts/components/conversation/Message.dom.tsx
+index c161922bb..2dc3b3fb0 100644
+--- a/ts/components/conversation/Message.dom.tsx
++++ b/ts/components/conversation/Message.dom.tsx
+@@ -10,6 +10,8 @@ import type {
+   KeyboardEvent,
+   MouseEvent,
+ } from 'react';
++import type { ServiceIdString } from '../../types/ServiceId.std.ts';
++import type { ReactElement } from 'react';
+ import { forwardRef, useRef, PureComponent, createRef } from 'react';
+ import { createPortal } from 'react-dom';
+ import classNames from 'classnames';
+@@ -3077,7 +3079,13 @@ export class Message extends PureComponent<Props, State> {
+   }
+ 
+   #renderReactions(outgoing: boolean, messageBubbleWidth: number): ReactNode {
+-    const { getPreferredBadge, reactions = [], i18n, theme, vesperDeletionRequested = false } = this.props;
++    const {
++      getPreferredBadge,
++      reactions = [],
++      i18n,
++      theme,
++      vesperDeletionRequested = false,
++    } = this.props;
+ 
+     if (!this.#hasReactionRail()) {
+       return null;
+@@ -3438,7 +3446,7 @@ export class Message extends PureComponent<Props, State> {
+     const renderMessageWithReactionRail = (
+       messageBubbleRef?: RefObject<HTMLDivElement | null>,
+       messageBubbleWidth = 0
+-    ): ReactNode => (
++    ): ReactElement => (
+       <>
+         {maybeWrapWithContextMenu(
+           // the keyboard handler is a level higher in hierarchy due to selection
+diff --git a/ts/components/conversation/MessageDetail.dom.tsx b/ts/components/conversation/MessageDetail.dom.tsx
+index 0396a4d18..6183600ea 100644
+--- a/ts/components/conversation/MessageDetail.dom.tsx
++++ b/ts/components/conversation/MessageDetail.dom.tsx
+@@ -517,7 +517,9 @@ function ContactGroupItem({
+           size={AvatarSize.THIRTY_TWO}
+         />
+       }
+-      title={<ContactName serviceId={contact.serviceId} title={contact.title} />}
++      title={
++        <ContactName serviceId={contact.serviceId} title={contact.title} />
++      }
+       description={
+         <>
+           {contactErrors.map(contactError => (
+diff --git a/ts/state/smart/Preferences.preload.tsx b/ts/state/smart/Preferences.preload.tsx
+index 5f24ef591..5358d3c16 100644
+--- a/ts/state/smart/Preferences.preload.tsx
++++ b/ts/state/smart/Preferences.preload.tsx
+@@ -1272,8 +1272,8 @@ export function SmartPreferences(): JSX.Element | null {
+         selectedSpeaker={selectedSpeaker}
+         sentMediaQualitySetting={sentMediaQualitySetting}
+         setGlobalDefaultConversationColor={setGlobalDefaultConversationColor}
+-        onToggleInternalSettings={() => {
+-          putItem(
++        onToggleInternalSettings={async () => {
++          await putItem(
+             'vesperInternalSettings',
+             items.vesperInternalSettings !== true
+           );
+diff --git a/ts/test-node/app/menu_test.node.ts b/ts/test-node/app/menu_test.node.ts
+index 9dc959876..76e5283aa 100644
+--- a/ts/test-node/app/menu_test.node.ts
++++ b/ts/test-node/app/menu_test.node.ts
+@@ -313,7 +313,7 @@ describe('createTemplate', () => {
+     if (!Array.isArray(viewMenu?.submenu)) {
+       throw new Error('View menu is missing');
+     }
+-    const debugLogItem = (viewMenu.submenu as MenuListType).find(
++    const debugLogItem = viewMenu.submenu.find(
+       item => item.label === 'Debug Log'
+     );
+ 
+diff --git a/ts/windows/applyTheme.dom.ts b/ts/windows/applyTheme.dom.ts
+index 6af0fee21..90082ade6 100644
+--- a/ts/windows/applyTheme.dom.ts
++++ b/ts/windows/applyTheme.dom.ts
+@@ -41,5 +41,3 @@ void applyThemeLoop();
+ window.SignalContext.nativeThemeListener.subscribe(() => {
+   void applyTheme();
+ });
+-
+-export {};
