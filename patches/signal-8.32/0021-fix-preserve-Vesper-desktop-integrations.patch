@@ -1,0 +1,907 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Fri, 21 Aug 2026 14:41:13 +0000
+Subject: [PATCH 21/24] fix: preserve Vesper desktop integrations
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ _locales/en/messages.json                     |  20 +++
+ app/main.main.ts                              | 157 ++++++++++++++++--
+ knip.js                                       |   2 +
+ stylesheets/_modules.scss                     |   4 +-
+ stylesheets/_variables.scss                   |  44 +++--
+ stylesheets/components/App.scss               |  11 +-
+ stylesheets/components/ProgressBar.scss       |   2 +-
+ stylesheets/components/Select.scss            |  17 +-
+ ts/axo/_tailwind-theme/colors.css             |  14 +-
+ ts/background.preload.ts                      |   2 +-
+ ts/components/App.dom.tsx                     |   6 +-
+ ts/components/Preferences.dom.stories.tsx     |   2 +
+ ts/components/Preferences.dom.tsx             |   2 +
+ ts/main/settingsChannel.main.ts               |   2 +
+ ts/state/smart/Preferences.preload.tsx        |  12 ++
+ .../util/vesperDeleteForEveryone_test.std.ts  |   2 +-
+ ts/test-node/util/vesperProtocol_test.std.ts  |   2 +-
+ ts/util/createIPCEvents.preload.ts            |   8 +
+ ts/util/preload.preload.ts                    |   2 +
+ ts/util/vesperDeleteForEveryone.std.ts        |   2 +-
+ ts/util/vesperProtocol.std.ts                 |  11 +-
+ ts/window.d.ts                                |   8 +
+ ts/windows/applyTheme.dom.ts                  |  14 +-
+ ts/windows/context.preload.ts                 |   1 +
+ ts/windows/main/phase1-ipc.preload.ts         |  12 ++
+ ts/windows/minimalContext.preload.ts          |   1 +
+ ts/windows/preload.preload.ts                 |   1 +
+ 27 files changed, 299 insertions(+), 62 deletions(-)
+
+diff --git a/_locales/en/messages.json b/_locales/en/messages.json
+index 97ba644f7..69d500a70 100644
+--- a/_locales/en/messages.json
++++ b/_locales/en/messages.json
+@@ -335,6 +335,14 @@
+     "messageformat": "Minimize",
+     "description": "Window menu command to minimize the current window"
+   },
++  "icu:VesperTitleBar--menu": {
++    "messageformat": "Application menu",
++    "description": "Accessible label for the menus in the custom Vesper titlebar"
++  },
++  "icu:VesperTitleBar--restore": {
++    "messageformat": "Restore",
++    "description": "Accessible label for restoring a maximized Vesper window"
++  },
+   "icu:windowMenuZoom": {
+     "messageformat": "Zoom",
+     "description": "Window menu command to make the current window the size of the whole screen"
+@@ -2477,6 +2485,18 @@
+     "messageformat": "Theme",
+     "description": "Header for theme settings"
+   },
++  "icu:Preferences--colour-palette": {
++    "messageformat": "Colour palette",
++    "description": "Label for choosing between the Vesper and Signal colour palettes"
++  },
++  "icu:Preferences--colour-palette-vesper": {
++    "messageformat": "Vesper",
++    "description": "Option for the Vesper colour palette"
++  },
++  "icu:Preferences--colour-palette-signal": {
++    "messageformat": "Signal",
++    "description": "Option for the Signal colour palette"
++  },
+   "icu:calling": {
+     "messageformat": "Calling",
+     "description": "Header for calling options on the settings screen"
+diff --git a/app/main.main.ts b/app/main.main.ts
+index 78dd72300..8ba37eb30 100644
+--- a/app/main.main.ts
++++ b/app/main.main.ts
+@@ -381,20 +381,33 @@ type GetBackgroundColorOptionsType = GetThemeSettingOptionsType &
+ const AXO_COLOR_BRAND_LOGO = '#7152ff';
+ const AXO_COLOR_SURFACE_PRIMARY_LIGHT = '#f6f6ff';
+ const AXO_COLOR_SURFACE_PRIMARY_DARK = '#100e1f';
++const SIGNAL_COLOR_SURFACE_PRIMARY_LIGHT = '#fafafa';
++const SIGNAL_COLOR_SURFACE_PRIMARY_DARK = '#191919';
++
++function getBrandThemeSetting(): 'vesper' | 'signal' {
++  const value = ephemeralConfig.get('vesper-brand-theme');
++  return value === 'signal' ? 'signal' : 'vesper';
++}
+ 
+ async function getBackgroundColor(
+   options?: GetBackgroundColorOptionsType
+ ): Promise<string> {
+   const theme = await getResolvedThemeSetting(options);
++  const isSignalTheme = getBrandThemeSetting() === 'signal';
+ 
+   if (theme === 'light') {
+-    return options?.signalColors
+-      ? AXO_COLOR_BRAND_LOGO
++    if (options?.signalColors) {
++      return AXO_COLOR_BRAND_LOGO;
++    }
++    return isSignalTheme
++      ? SIGNAL_COLOR_SURFACE_PRIMARY_LIGHT
+       : AXO_COLOR_SURFACE_PRIMARY_LIGHT;
+   }
+ 
+   if (theme === 'dark') {
+-    return AXO_COLOR_SURFACE_PRIMARY_DARK;
++    return isSignalTheme
++      ? SIGNAL_COLOR_SURFACE_PRIMARY_DARK
++      : AXO_COLOR_SURFACE_PRIMARY_DARK;
+   }
+ 
+   throw missingCaseError(theme);
+@@ -460,6 +473,8 @@ if (windowConfigParsed.success) {
+   windowConfig = windowConfigParsed.data;
+ }
+ 
++let customTitleBarMenuVisible = false;
++
+ if (windowFromUserConfig) {
+   userConfig.set('window', null);
+   ephemeralConfig.set('window', windowConfig);
+@@ -653,10 +668,8 @@ if (OS.isWindows()) {
+   windowIcon = join(rootDir, 'build', 'icons', 'png', '512x512.png');
+ }
+ 
+-// The titlebar is hidden on:
+-//   - Windows < 10 (7, 8)
+-//   - macOS (but no custom titlebar is displayed, see
+-//     `--title-bar-drag-area-height` in `stylesheets/_titlebar.scss`
++// macOS keeps its native traffic lights. Windows and Linux use Vesper's
++// renderer-owned titlebar.
+ const mainTitleBarStyle = OS.isMacOS()
+   ? ('hidden' as const)
+   : ('default' as const);
+@@ -726,8 +739,8 @@ async function createWindow() {
+     height,
+     minWidth: MIN_WIDTH,
+     minHeight: MIN_HEIGHT,
+-    autoHideMenuBar: false,
+-    titleBarStyle: mainTitleBarStyle,
++    autoHideMenuBar: true,
++    ...(OS.isMacOS() ? { titleBarStyle: mainTitleBarStyle } : { frame: false }),
+     backgroundColor,
+     webPreferences: {
+       ...defaultWebPrefs,
+@@ -741,7 +754,7 @@ async function createWindow() {
+       spellcheck,
+     },
+     icon: windowIcon,
+-    ...pick(windowConfig, ['autoHideMenuBar', 'x', 'y']),
++    ...pick(windowConfig, ['x', 'y']),
+   };
+ 
+   if (!isNumber(windowOptions.width) || windowOptions.width < MIN_WIDTH) {
+@@ -836,7 +849,7 @@ async function createWindow() {
+ 
+     const newWindowConfig = {
+       maximized: mainWindow.isMaximized(),
+-      autoHideMenuBar: mainWindow.autoHideMenuBar,
++      autoHideMenuBar: !customTitleBarMenuVisible,
+       fullscreen: mainWindow.isFullScreen(),
+       // oxlint-disable-next-line typescript/no-non-null-assertion
+       width: size[0]!,
+@@ -2530,6 +2543,10 @@ function setupMenu(options?: Partial<CreateTemplateOptionsType>) {
+   );
+   const menu = Menu.buildFromTemplate(template);
+   Menu.setApplicationMenu(menu);
++  if (mainWindow && !OS.isMacOS()) {
++    mainWindow.autoHideMenuBar = true;
++    mainWindow.setMenuBarVisibility(false);
++  }
+ 
+   mainWindow?.webContents.send('window:set-menu-options', {
+     development: menuOptions.development,
+@@ -2787,7 +2804,15 @@ ipc.on('shutdown', () => {
+ ipc.on(
+   'set-auto-hide-menu-bar',
+   (_event: Electron.Event, autoHide: boolean) => {
+-    if (mainWindow) {
++    customTitleBarMenuVisible = !autoHide;
++    if (mainWindow && !OS.isMacOS()) {
++      mainWindow.autoHideMenuBar = true;
++      mainWindow.setMenuBarVisibility(false);
++      mainWindow.webContents.send(
++        'titlebar:set-menu-visibility',
++        customTitleBarMenuVisible
++      );
++    } else if (mainWindow) {
+       mainWindow.autoHideMenuBar = autoHide;
+     }
+   }
+@@ -2796,7 +2821,14 @@ ipc.on(
+ ipc.on(
+   'set-menu-bar-visibility',
+   (_event: Electron.Event, visibility: boolean) => {
+-    if (mainWindow) {
++    customTitleBarMenuVisible = visibility;
++    if (mainWindow && !OS.isMacOS()) {
++      mainWindow.setMenuBarVisibility(false);
++      mainWindow.webContents.send(
++        'titlebar:set-menu-visibility',
++        customTitleBarMenuVisible
++      );
++    } else if (mainWindow) {
+       mainWindow.setMenuBarVisibility(visibility);
+     }
+   }
+@@ -3068,6 +3100,18 @@ const onEphemeralSettingChanged = (name: string) => {
+     return;
+   }
+ 
++  if (name === 'brandTheme') {
++    drop(
++      (async () => {
++        const backgroundColor = await getBackgroundColor();
++        for (const window of activeWindows) {
++          window.setBackgroundColor(backgroundColor);
++        }
++      })()
++    );
++    return;
++  }
++
+   if (name !== 'contentProtection') {
+     return;
+   }
+@@ -3422,6 +3466,93 @@ ipc.handle('getMainWindowStats', async () => {
+   };
+ });
+ 
++ipc.handle('titlebar:get-state', ({ sender }) => {
++  const senderWindow = BrowserWindow.fromWebContents(sender);
++  if (!senderWindow || senderWindow !== mainWindow || OS.isMacOS()) {
++    return {
++      isCustomTitleBar: false,
++      menuItems: [],
++      menuVisible: false,
++    };
++  }
++
++  const menu = Menu.getApplicationMenu();
++  const menuItems =
++    menu?.items.flatMap((item, index) =>
++      item.submenu
++        ? [
++            {
++              index,
++              label: item.label.replaceAll('&', ''),
++            },
++          ]
++        : []
++    ) ?? [];
++
++  return {
++    isCustomTitleBar: true,
++    menuItems,
++    menuVisible: customTitleBarMenuVisible,
++  };
++});
++
++ipc.handle(
++  'titlebar:popup-menu',
++  ({ sender }, untrustedIndex, untrustedX, untrustedY) => {
++    const senderWindow = BrowserWindow.fromWebContents(sender);
++    if (!senderWindow || senderWindow !== mainWindow || OS.isMacOS()) {
++      return;
++    }
++
++    if (
++      !Number.isInteger(untrustedIndex) ||
++      !Number.isFinite(untrustedX) ||
++      !Number.isFinite(untrustedY)
++    ) {
++      return;
++    }
++
++    const menuItem = Menu.getApplicationMenu()?.items[untrustedIndex];
++    if (!menuItem?.submenu) {
++      return;
++    }
++
++    const { width, height } = senderWindow.getContentBounds();
++    const x = Math.max(0, Math.min(Math.floor(untrustedX), width));
++    const y = Math.max(0, Math.min(Math.floor(untrustedY), height));
++
++    return new Promise<void>(resolve => {
++      menuItem.submenu?.popup({
++        window: senderWindow,
++        x,
++        y,
++        callback: resolve,
++      });
++    });
++  }
++);
++
++ipc.handle('titlebar:window-action', ({ sender }, action) => {
++  const senderWindow = BrowserWindow.fromWebContents(sender);
++  if (!senderWindow || senderWindow !== mainWindow || OS.isMacOS()) {
++    return;
++  }
++
++  switch (action) {
++    case 'minimize':
++      senderWindow.minimize();
++      break;
++    case 'toggle-maximize':
++      toggleMaximizedBrowserWindow(senderWindow);
++      break;
++    case 'close':
++      senderWindow.close();
++      break;
++    default:
++      break;
++  }
++});
++
+ ipc.handle('getMenuOptions', async () => {
+   return {
+     development: menuOptions?.development ?? false,
+diff --git a/knip.js b/knip.js
+index bc193e4fd..642f870ec 100644
+--- a/knip.js
++++ b/knip.js
+@@ -46,6 +46,8 @@ const config = {
+         // Others
+         'codemods/**/*.mjs',
+         'scripts/**/*.mjs',
++        'ts/updater/signVesperUpdate.node.ts',
++        'ts/updater/verifyVesperUpdate.node.ts',
+       ],
+       project: [
+         // Production
+diff --git a/stylesheets/_modules.scss b/stylesheets/_modules.scss
+index 2634f416f..9dc37f983 100644
+--- a/stylesheets/_modules.scss
++++ b/stylesheets/_modules.scss
+@@ -388,7 +388,7 @@ $message-padding-horizontal: 12px;
+ }
+ 
+ .module-message__wrapper--selected {
+-  background: rgba(variables.$color-ultramarine, 8%);
++  background: rgb(from variables.$color-ultramarine r g b / 8%);
+ }
+ 
+ .module-message__select-checkbox {
+@@ -5944,7 +5944,7 @@ button.module-calling-participants-list__contact {
+ }
+ .module-message__action--incoming--in-another-call {
+   @include mixins.light-theme {
+-    color: rgba(variables.$color-link, 0.5);
++    color: rgb(from variables.$color-link r g b / 50%);
+   }
+   @include mixins.dark-theme {
+     color: rgba(variables.$color-white, 0.5);
+diff --git a/stylesheets/_variables.scss b/stylesheets/_variables.scss
+index 96231c312..96dcb6008 100644
+--- a/stylesheets/_variables.scss
++++ b/stylesheets/_variables.scss
+@@ -24,7 +24,31 @@ $monospace:
+ 
+ // -- V3 Colors
+ 
+-$color-accent-blue: #7152ff;
++:root {
++  --vesper-color-accent-blue: #7152ff;
++  --vesper-color-ultramarine-dark: #3e24b4;
++  --vesper-color-ultramarine-logo: #7152ff;
++  --vesper-color-ultramarine-light: #aa98ff;
++  --vesper-color-ultramarine-dawn: #5335dd;
++  --vesper-color-ultramarine-pastel: #c8bdff;
++  --vesper-color-ultramarine-pale: #e5dfff;
++  --vesper-color-ultramarine: #7152ff;
++  --vesper-color-link: #5335dd;
++}
++
++body.signal-brand-theme {
++  --vesper-color-accent-blue: #2c6bed;
++  --vesper-color-ultramarine-dark: #1851b4;
++  --vesper-color-ultramarine-logo: #3b45fd;
++  --vesper-color-ultramarine-light: #6191f3;
++  --vesper-color-ultramarine-dawn: #406ec9;
++  --vesper-color-ultramarine-pastel: #abc4f8;
++  --vesper-color-ultramarine-pale: #d2dffb;
++  --vesper-color-ultramarine: #2c6bed;
++  --vesper-color-link: #315ff4;
++}
++
++$color-accent-blue: var(--vesper-color-accent-blue);
+ $color-accent-green: #4caf50;
+ $color-accent-red: #f44336;
+ $color-accent-yellow: #ffd624;
+@@ -87,14 +111,14 @@ $color-black-alpha-90: rgba($color-black, 0.9);
+ 
+ $color-transparent: rgba(0, 0, 0, 0);
+ 
+-$color-ultramarine-dark: #3e24b4;
+-$color-ultramarine-logo: #7152ff;
+-$color-ultramarine-light: #aa98ff;
+-$color-ultramarine-dawn: #5335dd;
+-$color-ultramarine-pastel: #c8bdff;
+-$color-ultramarine-pale: #e5dfff;
+-$color-ultramarine: #7152ff;
+-$color-link: #5335dd;
++$color-ultramarine-dark: var(--vesper-color-ultramarine-dark);
++$color-ultramarine-logo: var(--vesper-color-ultramarine-logo);
++$color-ultramarine-light: var(--vesper-color-ultramarine-light);
++$color-ultramarine-dawn: var(--vesper-color-ultramarine-dawn);
++$color-ultramarine-pastel: var(--vesper-color-ultramarine-pastel);
++$color-ultramarine-pale: var(--vesper-color-ultramarine-pale);
++$color-ultramarine: var(--vesper-color-ultramarine);
++$color-link: var(--vesper-color-link);
+ 
+ // Flat colors
+ 
+@@ -119,7 +143,7 @@ $color-orange: #ff9500;
+ $color-ultramarine-gradient: (
+   deg: 180deg,
+   start: #8d75ff,
+-  end: $color-ultramarine,
++  end: #7152ff,
+ );
+ $color-basil: (
+   deg: 180deg,
+diff --git a/stylesheets/components/App.scss b/stylesheets/components/App.scss
+index 89a9d9f0b..e3efbeea7 100644
+--- a/stylesheets/components/App.scss
++++ b/stylesheets/components/App.scss
+@@ -4,10 +4,15 @@
+ @use '../variables';
+ 
+ .App {
++  display: flex;
++  flex-direction: column;
+   height: 100%;
+   position: relative;
+ 
+-  // TitleBar support
+-  display: flex;
+-  flex-direction: column;
++  &__content {
++    flex: 1 1 auto;
++    min-height: 0;
++    overflow: hidden;
++    position: relative;
++  }
+ }
+diff --git a/stylesheets/components/ProgressBar.scss b/stylesheets/components/ProgressBar.scss
+index d5545667f..b0a480c65 100644
+--- a/stylesheets/components/ProgressBar.scss
++++ b/stylesheets/components/ProgressBar.scss
+@@ -6,7 +6,7 @@
+ .ProgressBar {
+   position: relative;
+   overflow: hidden;
+-  background: rgba(variables.$color-ultramarine, 0.2);
++  background: rgb(from variables.$color-ultramarine r g b / 20%);
+   height: 5px;
+   border-radius: 2px;
+ }
+diff --git a/stylesheets/components/Select.scss b/stylesheets/components/Select.scss
+index 20f9fb916..345b9903c 100644
+--- a/stylesheets/components/Select.scss
++++ b/stylesheets/components/Select.scss
+@@ -44,18 +44,9 @@
+     inset-inline-end: 8px;
+     top: 11px;
+     width: 16px;
+-    @include mixins.light-theme {
+-      @include mixins.color-svg(
+-        '../images/icons/v3/dropdown/dropdown-compact-light.svg',
+-        variables.$color-gray-60
+-      );
+-    }
+-
+-    @include mixins.dark-theme {
+-      @include mixins.color-svg(
+-        '../images/icons/v3/dropdown/dropdown-compact-light.svg',
+-        variables.$color-gray-15
+-      );
+-    }
++    @include mixins.color-svg(
++      '../images/icons/v3/dropdown/dropdown-compact-light.svg',
++      var(--axo-color-label-secondary)
++    );
+   }
+ }
+diff --git a/ts/axo/_tailwind-theme/colors.css b/ts/axo/_tailwind-theme/colors.css
+index ca75b402b..6b8f10633 100644
+--- a/ts/axo/_tailwind-theme/colors.css
++++ b/ts/axo/_tailwind-theme/colors.css
+@@ -189,8 +189,8 @@
+   --axo-color-surface-tertiary:         light-dark(#eeeaff, #1e1645);
+   --axo-color-surface-quaternary:       light-dark(#eae5ff, #231a4e);
+   --axo-color-surface-card:             light-dark(#ffffff, #281e57);
+-  --axo-color-surface-message-incoming: light-dark(#eeeaff, #281e57);
+-  --axo-color-surface-message-outgoing: light-dark(#2267f5, #2267f5);
++  --axo-color-surface-message-incoming: light-dark(#eeeaff, #231a4e);
++  --axo-color-surface-message-outgoing: light-dark(#7152ff, #5335dd);
+ }
+ 
+ /* prettier-ignore */
+@@ -400,10 +400,10 @@
+       --axo-color-fill-safety-tint:                light-dark(--alpha(#b95929 / 12%), --alpha(#eb977d / 16%));
+       --axo-color-fill-safety-tint-pressed:        light-dark(--alpha(#b95929 / 16%), --alpha(#eb977d / 20%));
+ 
+-      --axo-color-fill-destructive:                light-dark(#b80c00, #b80c00);
+-      --axo-color-fill-destructive-pressed:        light-dark(#a80b00, #c20d00);
+-      --axo-color-fill-destructive-tint:           light-dark(--alpha(#d91304 / 12%), --alpha(#fe006e / 20%));
+-      --axo-color-fill-destructive-tint-pressed:   light-dark(--alpha(#d91304 / 16%), --alpha(#fe006e / 24%));
++      --axo-color-fill-destructive:                light-dark(#a0003b, #fe006e);
++      --axo-color-fill-destructive-pressed:        light-dark(#890033, #e90065);
++      --axo-color-fill-destructive-tint:           light-dark(--alpha(#e00052 / 12%), --alpha(#fe006e / 20%));
++      --axo-color-fill-destructive-tint-pressed:   light-dark(--alpha(#e00052 / 16%), --alpha(#fe006e / 24%));
+ 
+       --axo-color-fill-white:                      light-dark(#ffffff, #ffffff);
+       --axo-color-fill-white-pressed:              light-dark(#f6f6ff, #f6f6ff);
+@@ -482,7 +482,7 @@
+       --axo-color-border-primary:               light-dark(--alpha(#000000 / 24%), --alpha(#ffffff / 24%));
+       --axo-color-border-secondary:             light-dark(--alpha(#000000 / 32%), --alpha(#ffffff / 32%));
+       --axo-color-border-tertiary:              light-dark(--alpha(#000000 / 70%), --alpha(#ffffff / 70%));
+-      --axo-color-border-selected:              light-dark(#3243ff, #c9ceff);
++      --axo-color-border-selected:              light-dark(#5335dd, #c8bdff);
+       --axo-color-border-selected-oncolor:      light-dark(#f6f6ff, #f6f6ff);
+       --axo-color-border-focused-inner:         light-dark(#ffffff, #000000);
+       --axo-color-border-focused-outer:         light-dark(#67697e, #e4e5f0);
+diff --git a/ts/background.preload.ts b/ts/background.preload.ts
+index e920e7c6c..6e3b43903 100644
+--- a/ts/background.preload.ts
++++ b/ts/background.preload.ts
+@@ -1604,7 +1604,7 @@ async function startApp(): Promise<void> {
+     const appContainer = document.getElementById('app-container');
+     strictAssert(appContainer != null, 'No #app-container');
+     createRoot(appContainer).render(createAppRoot(window.reduxStore));
+-    const hideMenuBar = itemStorage.get('hide-menu-bar', false);
++    const hideMenuBar = itemStorage.get('hide-menu-bar', true);
+     window.IPC.setAutoHideMenuBar(hideMenuBar);
+     window.IPC.setMenuBarVisibility(!hideMenuBar);
+ 
+diff --git a/ts/components/App.dom.tsx b/ts/components/App.dom.tsx
+index 4278351a0..eac660f2a 100644
+--- a/ts/components/App.dom.tsx
++++ b/ts/components/App.dom.tsx
+@@ -7,6 +7,7 @@ import { AppViewType } from '../types/app.std.ts';
+ import { missingCaseError } from '../util/missingCaseError.std.ts';
+ import { usePageVisibility } from '../hooks/usePageVisibility.dom.ts';
+ import { TitlebarDragArea } from './TitlebarDragArea.dom.tsx';
++import { VesperTitleBar } from './VesperTitleBar.dom.tsx';
+ import { ThemeType } from '../types/Util.std.ts';
+ 
+ import type { ViewStoryActionCreatorType } from '../state/ducks/stories.preload.ts';
+@@ -104,7 +105,10 @@ export function App({
+ 
+   return (
+     <div className="App">
+-      {contents}
++      {!isFullScreen && osClassName !== 'os-macos' && (
++        <VesperTitleBar isMaximized={isMaximized} />
++      )}
++      <div className="App__content">{contents}</div>
+       {renderGlobalModalContainer()}
+       {renderCallManager()}
+       {renderLightbox()}
+diff --git a/ts/components/Preferences.dom.stories.tsx b/ts/components/Preferences.dom.stories.tsx
+index 2458c6cea..f32ac7ace 100644
+--- a/ts/components/Preferences.dom.stories.tsx
++++ b/ts/components/Preferences.dom.stories.tsx
+@@ -536,6 +536,7 @@ export default {
+     selectedSpeaker: availableSpeakers[1],
+     sentMediaQualitySetting: 'standard',
+     shouldShowUpdateDialog: false,
++    brandTheme: 'vesper',
+     themeSetting: 'system',
+     theme: ThemeType.light,
+     universalExpireTimer: DurationInSeconds.HOUR,
+@@ -645,6 +646,7 @@ export default {
+     onSpellCheckChange: action('onSpellCheckChange'),
+     onStartUpdate: action('onStartUpdate'),
+     onTextFormattingChange: action('onTextFormattingChange'),
++    onBrandThemeChange: action('onBrandThemeChange'),
+     onThemeChange: action('onThemeChange'),
+     onToggleNavTabsCollapse: action('onToggleNavTabsCollapse'),
+     onTypingIndicatorsChange: action('onTypingIndicatorsChange'),
+diff --git a/ts/components/Preferences.dom.tsx b/ts/components/Preferences.dom.tsx
+index 4766d4cf0..290134549 100644
+--- a/ts/components/Preferences.dom.tsx
++++ b/ts/components/Preferences.dom.tsx
+@@ -392,6 +392,7 @@ type PropsFunctionType = {
+   onSentMediaQualityChange: SelectChangeHandlerType<SentMediaQualityType>;
+   onSpellCheckChange: CheckboxChangeHandlerType;
+   onTextFormattingChange: CheckboxChangeHandlerType;
++  onBrandThemeChange: SelectChangeHandlerType<BrandThemeType>;
+   onThemeChange: SelectChangeHandlerType<ThemeType>;
+   onToggleNavTabsCollapse: (navTabsCollapsed: boolean) => void;
+   onTypingIndicatorsChange: CheckboxChangeHandlerType;
+@@ -602,6 +603,7 @@ export function Preferences({
+   onSentMediaQualityChange,
+   onSpellCheckChange,
+   onTextFormattingChange,
++  onBrandThemeChange,
+   onThemeChange,
+   onToggleNavTabsCollapse,
+   onTypingIndicatorsChange,
+diff --git a/ts/main/settingsChannel.main.ts b/ts/main/settingsChannel.main.ts
+index 98bf35265..2faf65157 100644
+--- a/ts/main/settingsChannel.main.ts
++++ b/ts/main/settingsChannel.main.ts
+@@ -16,6 +16,7 @@ import type { EphemeralSettings } from '../util/preload.preload.ts';
+ const log = createLogger('settingsChannel');
+ 
+ const EPHEMERAL_NAME_MAP = new Map([
++  ['brandTheme', 'vesper-brand-theme'],
+   ['spellCheck', 'spell-check'],
+   ['systemTraySetting', 'system-tray-setting'],
+   ['themeSetting', 'theme-setting'],
+@@ -45,6 +46,7 @@ export class SettingsChannel extends EventEmitter {
+   }
+ 
+   public install(): void {
++    this.#installEphemeralSetting('brandTheme');
+     this.#installEphemeralSetting('themeSetting');
+     this.#installEphemeralSetting('systemTraySetting');
+     this.#installEphemeralSetting('localeOverride');
+diff --git a/ts/state/smart/Preferences.preload.tsx b/ts/state/smart/Preferences.preload.tsx
+index ef5604f3e..df502bccb 100644
+--- a/ts/state/smart/Preferences.preload.tsx
++++ b/ts/state/smart/Preferences.preload.tsx
+@@ -422,7 +422,9 @@ export function SmartPreferences(): JSX.Element | null {
+   const [systemTraySettings, setSystemTraySettings] =
+     useState<SystemTraySetting>();
+   const [hasContentProtection, setContentProtection] = useState<boolean>();
++  const [hasDebugLogging, setDebugLogging] = useState<boolean>();
+   const [hasSpellCheck, setSpellCheck] = useState<boolean>();
++  const [brandTheme, setBrandTheme] = useState<BrandThemeType>();
+   const [themeSetting, setThemeSetting] = useState<ThemeType>();
+ 
+   useEffect(() => {
+@@ -461,6 +463,12 @@ export function SmartPreferences(): JSX.Element | null {
+     };
+     drop(loadContentProtection());
+ 
++    const loadDebugLogging = async () => {
++      const value = await window.Events.getDebugLogging();
++      setDebugLogging(value);
++    };
++    drop(loadDebugLogging());
++
+     const loadThemeSetting = async () => {
+       const value = await window.Events.getThemeSetting();
+       if (canceled) {
+@@ -514,6 +522,10 @@ export function SmartPreferences(): JSX.Element | null {
+     setContentProtection(value);
+     await window.Events.setContentProtection(value);
+   };
++  const onDebugLoggingChange = async (value: boolean) => {
++    setDebugLogging(value);
++    await window.Events.setDebugLogging(value);
++  };
+   const onThemeChange = (value: ThemeType) => {
+     setThemeSetting(value);
+     drop(window.Events.setThemeSetting(value));
+diff --git a/ts/test-node/util/vesperDeleteForEveryone_test.std.ts b/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
+index 1f89aa53e..ccd9f5854 100644
+--- a/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
++++ b/ts/test-node/util/vesperDeleteForEveryone_test.std.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 amber
++// Copyright 2026 Signal Messenger, LLC
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import { assert } from 'chai';
+diff --git a/ts/test-node/util/vesperProtocol_test.std.ts b/ts/test-node/util/vesperProtocol_test.std.ts
+index cea47c92e..779e5ab3f 100644
+--- a/ts/test-node/util/vesperProtocol_test.std.ts
++++ b/ts/test-node/util/vesperProtocol_test.std.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 amber
++// Copyright 2026 Signal Messenger, LLC
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import { assert } from 'chai';
+diff --git a/ts/util/createIPCEvents.preload.ts b/ts/util/createIPCEvents.preload.ts
+index 33d7c2707..857213b49 100644
+--- a/ts/util/createIPCEvents.preload.ts
++++ b/ts/util/createIPCEvents.preload.ts
+@@ -94,6 +94,7 @@ type ValuesWithGetters = Omit<
+   | 'contentProtection'
+   | 'debugLogging'
+   | 'systemTraySetting'
++  | 'brandTheme'
+   | 'themeSetting'
+   | 'zoomFactor'
+ >;
+@@ -129,6 +130,7 @@ export type IPCEventsGettersType = {
+   getContentProtection: () => Promise<boolean>;
+   getDebugLogging: () => Promise<boolean>;
+   getSystemTraySetting: () => Promise<SystemTraySetting>;
++  getBrandTheme: () => Promise<BrandThemeType>;
+   getThemeSetting: () => Promise<ThemeType>;
+   getZoomFactor: () => Promise<ZoomFactorType>;
+   // Events
+@@ -241,6 +243,12 @@ export function createIPCEvents(
+     setSystemTraySetting: async (value: SystemTraySetting) => {
+       await setEphemeralSetting('systemTraySetting', value);
+     },
++    getBrandTheme: async () => {
++      return (await getEphemeralSetting('brandTheme')) ?? 'vesper';
++    },
++    setBrandTheme: async (value: BrandThemeType) => {
++      await setEphemeralSetting('brandTheme', value);
++    },
+     getThemeSetting: async () => {
+       return (await getEphemeralSetting('themeSetting')) ?? 'system';
+     },
+diff --git a/ts/util/preload.preload.ts b/ts/util/preload.preload.ts
+index c7d971740..61f95951c 100644
+--- a/ts/util/preload.preload.ts
++++ b/ts/util/preload.preload.ts
+@@ -7,6 +7,7 @@ import { strictAssert } from './assert.std.ts';
+ import * as Errors from '../types/errors.std.ts';
+ import type { IPCEventsValuesType } from './createIPCEvents.preload.ts';
+ import type { SystemTraySetting } from '../types/SystemTraySetting.std.ts';
++import type { BrandThemeType } from './theme.std.ts';
+ 
+ type SettingOptionsType = {
+   getter?: boolean;
+@@ -21,6 +22,7 @@ export type SettingType<Value> = Readonly<{
+ export type ThemeType = 'light' | 'dark' | 'system';
+ 
+ export type EphemeralSettings = {
++  brandTheme: BrandThemeType;
+   localeOverride: string | null;
+   spellCheck: boolean;
+   contentProtection: boolean;
+diff --git a/ts/util/vesperDeleteForEveryone.std.ts b/ts/util/vesperDeleteForEveryone.std.ts
+index ad7629641..da540d20c 100644
+--- a/ts/util/vesperDeleteForEveryone.std.ts
++++ b/ts/util/vesperDeleteForEveryone.std.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 amber
++// Copyright 2026 Signal Messenger, LLC
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ export function shouldKeepDeletedMessage({
+diff --git a/ts/util/vesperProtocol.std.ts b/ts/util/vesperProtocol.std.ts
+index d40d82005..486a7d26c 100644
+--- a/ts/util/vesperProtocol.std.ts
++++ b/ts/util/vesperProtocol.std.ts
+@@ -1,11 +1,10 @@
+-// Copyright 2026 amber
++// Copyright 2026 Signal Messenger, LLC
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+-export const VESPER_PROTOCOL_SCHEME = 'vesper';
+-export const VESPER_CAPTCHA_PROTOCOL_SCHEME = 'vespercaptcha';
+-export const VESPER_DEVELOPMENT_PROTOCOL_SCHEME = 'vesper-development';
+-export const VESPER_DEVELOPMENT_CAPTCHA_PROTOCOL_SCHEME =
+-  'vespercaptcha-development';
++const VESPER_PROTOCOL_SCHEME = 'vesper';
++const VESPER_CAPTCHA_PROTOCOL_SCHEME = 'vespercaptcha';
++const VESPER_DEVELOPMENT_PROTOCOL_SCHEME = 'vesper-development';
++const VESPER_DEVELOPMENT_CAPTCHA_PROTOCOL_SCHEME = 'vespercaptcha-development';
+ 
+ const ProtocolAliases = new Map([
+   [`${VESPER_PROTOCOL_SCHEME}:`, 'sgnl:'],
+diff --git a/ts/window.d.ts b/ts/window.d.ts
+index 76c43723a..0fbf7fab2 100644
+--- a/ts/window.d.ts
++++ b/ts/window.d.ts
+@@ -43,6 +43,7 @@ export type IPCType = {
+     mediaType: 'screen' | 'microphone' | 'camera'
+   ) => Promise<ReturnType<SystemPreferences['getMediaAccessStatus']>>;
+   getMediaCameraPermissions: () => Promise<boolean | undefined>;
++  getTitleBarState: () => Promise<TitleBarStateType>;
+   openSystemMediaPermissions: (
+     mediaType: 'microphone' | 'camera' | 'screenCapture'
+   ) => Promise<void>;
+@@ -57,6 +58,10 @@ export type IPCType = {
+   setMediaPermissions: (value: boolean) => Promise<void>;
+   setMediaCameraPermissions: (value: boolean) => Promise<void>;
+   setMenuBarVisibility: (value: boolean) => void;
++  onTitleBarMenuVisibilityChange: (
++    callback: (visible: boolean) => void
++  ) => () => void;
++  popupTitleBarMenu: (index: number, x: number, y: number) => Promise<void>;
+   showDebugLog: (options?: { mode?: 'submit' | 'close' }) => void;
+   showCallDiagnostic: () => void;
+   closeCallDiagnostic: () => void;
+@@ -73,6 +78,9 @@ export type IPCType = {
+   startTrackingQueryStats: () => void;
+   stopTrackingQueryStats: (options?: QueryStatsOptions) => void;
+   titleBarDoubleClick: () => void;
++  titleBarWindowAction: (
++    action: 'minimize' | 'toggle-maximize' | 'close'
++  ) => Promise<void>;
+   updateTrayIcon: (count: number) => void;
+ };
+ 
+diff --git a/ts/windows/applyTheme.dom.ts b/ts/windows/applyTheme.dom.ts
+index c46645bfc..6af0fee21 100644
+--- a/ts/windows/applyTheme.dom.ts
++++ b/ts/windows/applyTheme.dom.ts
+@@ -1,16 +1,26 @@
+ // Copyright 2021 Signal Messenger, LLC
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
++import { brandThemeClassName } from '../util/theme.std.ts';
++
+ async function applyTheme() {
+-  const theme = await window.SignalContext.Settings.themeSetting.getValue();
++  const [theme, brandTheme] = await Promise.all([
++    window.SignalContext.Settings.themeSetting.getValue(),
++    window.SignalContext.Settings.brandTheme.getValue(),
++  ]);
+   document.body.classList.remove('light-theme');
+   document.body.classList.remove('dark-theme');
++  document.body.classList.remove(
++    brandThemeClassName('signal'),
++    brandThemeClassName('vesper')
++  );
+   document.body.classList.add(
+     `${
+       theme === 'system'
+         ? window.SignalContext.nativeThemeListener.getSystemTheme()
+         : theme
+-    }-theme`
++    }-theme`,
++    brandThemeClassName(brandTheme ?? 'vesper')
+   );
+ }
+ 
+diff --git a/ts/windows/context.preload.ts b/ts/windows/context.preload.ts
+index f4220f6b0..3f9c94510 100644
+--- a/ts/windows/context.preload.ts
++++ b/ts/windows/context.preload.ts
+@@ -58,6 +58,7 @@ export type MinimalSignalContextType = {
+   nativeThemeListener: NativeThemeType;
+   restartApp: () => void;
+   Settings: {
++    brandTheme: SettingType<SettingsValuesType['brandTheme']>;
+     themeSetting: SettingType<SettingsValuesType['themeSetting']>;
+     waitForChange: () => Promise<void>;
+   };
+diff --git a/ts/windows/main/phase1-ipc.preload.ts b/ts/windows/main/phase1-ipc.preload.ts
+index bf9c83bd7..5d5eef1cf 100644
+--- a/ts/windows/main/phase1-ipc.preload.ts
++++ b/ts/windows/main/phase1-ipc.preload.ts
+@@ -39,6 +39,16 @@ const { mapValues } = lodash;
+ 
+ const log = createLogger('phase1-ipc');
+ 
++const titleBarMenuVisibilityCallbacks = new Set<(visible: boolean) => void>();
++ipc.on('titlebar:set-menu-visibility', (_event, visible: unknown) => {
++  if (typeof visible !== 'boolean') {
++    return;
++  }
++  for (const callback of titleBarMenuVisibilityCallbacks) {
++    callback(visible);
++  }
++});
++
+ // We are comfortable doing this because we verified the type on the other side!
+ const { config } = SignalContext;
+ 
+@@ -111,6 +121,7 @@ const IPC: IPCType = {
+   getMediaPermissions: () => ipc.invoke('settings:get:mediaPermissions'),
+   getMediaCameraPermissions: () =>
+     ipc.invoke('settings:get:mediaCameraPermissions'),
++  getTitleBarState: () => ipc.invoke('titlebar:get-state'),
+   logAppLoadedEvent: ({ processedCount }) =>
+     ipc.send('signal-app-loaded', {
+       // Sequence of events:
+@@ -181,6 +192,7 @@ const IPC: IPCType = {
+   titleBarDoubleClick: () => {
+     ipc.send('title-bar-double-click');
+   },
++  titleBarWindowAction: action => ipc.invoke('titlebar:window-action', action),
+   updateTrayIcon: unreadCount => ipc.send('update-tray-icon', unreadCount),
+   whenWindowVisible,
+ };
+diff --git a/ts/windows/minimalContext.preload.ts b/ts/windows/minimalContext.preload.ts
+index 7e670a3d6..21765f0e4 100644
+--- a/ts/windows/minimalContext.preload.ts
++++ b/ts/windows/minimalContext.preload.ts
+@@ -66,6 +66,7 @@ export const MinimalSignalContext: MinimalSignalContextType = {
+     release: config.osRelease,
+   },
+   Settings: {
++    brandTheme: createSetting('brandTheme', { setter: false }),
+     themeSetting: createSetting('themeSetting', { setter: false }),
+     waitForChange: waitForSettingsChange,
+   },
+diff --git a/ts/windows/preload.preload.ts b/ts/windows/preload.preload.ts
+index abee6db14..391496326 100644
+--- a/ts/windows/preload.preload.ts
++++ b/ts/windows/preload.preload.ts
+@@ -3,6 +3,7 @@
+ 
+ import { installEphemeralSetting } from '../util/preload.preload.ts';
+ 
++installEphemeralSetting('brandTheme');
+ installEphemeralSetting('contentProtection');
+ installEphemeralSetting('debugLogging');
+ installEphemeralSetting('localeOverride');

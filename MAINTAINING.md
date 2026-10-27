@@ -23,6 +23,36 @@ For a source change:
 the pin. Advance the pin only after resolving patch conflicts and passing the
 same checks.
 
+### Signal v8.32 candidate
+
+The v8.25 pin and its top-level `patches/*.patch` series remain unchanged until
+both package and Flatpak validation pass. `patches/signal-8.32/` holds the
+rebased series for v8.32 and later candidates. Materialisation, verification,
+and export share `tools/patch_series.py`; export selects from the exact tag
+at the transform commit's parent, not from `upstream.pin`.
+
+The existing artifact-only build workflow tests both the pin (`Linux x64`)
+and explicit v8.32.0 candidate, with independent artifacts and fail-fast
+turned off. These jobs do not publish. Advance the pin only after the
+candidate's complete gate, including Flatpak build and encrypted-key
+restart smoke test, succeeds. Older tracker candidates are superseded, not
+individually qualified. After successful adoption, retire the old series and
+candidate matrix together in a reviewed follow-up; never silently switch
+which source the pin builds.
+
+Upstream's settings and contact surfaces now use Axo items. The rebased
+series retains Vesper's logging confirmation, remote-deletion preservation,
+seven-click internal settings toggle, brand palette selection, and author
+badge using those components. Chat-refresh support routing moves to the
+upstream dialog that now owns the action. Message rendering retains the
+upstream private methods and animation completion handler.
+
+On constrained build hosts, set `TMPDIR` to a filesystem with several GB of
+free space: Electron Builder/FPM stages and compresses the Debian package
+there. A small tmpfs can report only a generic tar failure. Flatpak still
+requires working unprivileged user namespaces and OSTree-compatible storage;
+do not disable confinement or advance the pin when those checks cannot run.
+
 ## Android parity
 
 The sibling `../vesper-android` project is the behavioural reference.

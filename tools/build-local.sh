@@ -17,6 +17,7 @@ if [[ ! -e "$WORK/.git" ]]; then
 fi
 
 "$ROOT/tools/verify-materialised.sh"
+python3 -m unittest discover -s "$ROOT/tools" -p 'test_chat_refresh_identity.py'
 
 [[ -f "$WORK/.nvmrc" && -f "$WORK/package.json" ]] || {
   echo "Materialised checkout is missing .nvmrc or package.json." >&2
@@ -72,6 +73,7 @@ node "$ROOT/tools/generate-icons.mjs" --check
 echo "Building workspace packages removed by clean rematerialisation..."
 pnpm --filter @signalapp/types build
 pnpm --filter @signalapp/windows-ucv build
+pnpm --filter @signalapp/mock-server build
 
 echo "Generating application assets..."
 pnpm run generate
@@ -99,7 +101,8 @@ LANG=en-us \
     ts/test-node/VesperConfig_test.dom.ts \
     ts/test-node/util/isVesperAuthor_test.dom.ts \
     ts/test-node/util/vesperDeleteForEveryone_test.std.ts \
-    ts/test-node/util/vesperProtocol_test.std.ts
+    ts/test-node/util/vesperProtocol_test.std.ts \
+    ts/test-node/util/createSupportUrl_test.std.ts
 
 echo "Generating the Electron preload cache..."
 ARTIFACTS_DIR=artifacts/linux \

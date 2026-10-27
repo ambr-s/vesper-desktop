@@ -158,17 +158,18 @@ for (const relativePath of [
   }
 }
 
-const chatRefreshSource = await readFile(
-  path.join(
-    checkout,
+const chatRefreshSources = await Promise.all(
+  [
     "ts/components/conversation/ChatSessionRefreshedNotification.dom.tsx",
-  ),
-  { encoding: "utf8" },
+    "ts/components/conversation/ChatSessionRefreshedDialog.dom.tsx",
+  ].map(relativePath => readFile(path.join(checkout, relativePath), "utf8")),
 );
-if (chatRefreshSource.includes("support.signal.org/hc/requests/new")) {
-  throw new Error("Signal support submission remains in chat refresh help");
+for (const source of chatRefreshSources) {
+  if (source.includes("support.signal.org/hc/requests/new")) {
+    throw new Error("Signal support submission remains in chat refresh help");
+  }
 }
-if (!chatRefreshSource.includes("createSupportUrl")) {
+if (!chatRefreshSources.some(source => source.includes("createSupportUrl"))) {
   throw new Error("Chat refresh help is not routed through Vesper support");
 }
 
