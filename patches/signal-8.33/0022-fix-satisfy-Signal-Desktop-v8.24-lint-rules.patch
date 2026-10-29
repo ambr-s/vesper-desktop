@@ -1,0 +1,461 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Fri, 21 Aug 2026 14:48:52 +0000
+Subject: [PATCH 22/26] fix: satisfy Signal Desktop v8.24 lint rules
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ stylesheets/manifest.scss                     |  2 +
+ ts/VesperConfig.dom.ts                        |  2 +-
+ ts/axo/_tailwind-theme/colors.css             |  2 +-
+ ts/background.preload.ts                      | 19 +++---
+ ts/components/Preferences.dom.tsx             | 64 ++++++++++---------
+ ts/components/StoryListItem.dom.tsx           |  2 +-
+ ts/components/VesperTitleBar.dom.tsx          |  2 +-
+ .../conversation/AboutContactModal.dom.tsx    |  2 +-
+ .../conversation/ContactName.dom.tsx          |  2 +-
+ .../conversation/ConversationHeader.dom.tsx   |  2 +-
+ .../conversation/GroupV1Migration.dom.tsx     |  9 +--
+ .../ConversationDetailsHeader.dom.tsx         |  2 +-
+ ts/state/smart/Preferences.preload.tsx        |  2 +
+ ts/test-node/VesperConfig_test.dom.ts         | 10 ++-
+ ...test.std.ts => isVesperAuthor_test.dom.ts} |  4 +-
+ ts/util/createIPCEvents.preload.ts            |  1 +
+ ...perAuthor.std.ts => isVesperAuthor.dom.ts} |  2 +-
+ ts/window.d.ts                                | 11 ++++
+ ts/windows/main/phase1-ipc.preload.ts         |  6 ++
+ 19 files changed, 88 insertions(+), 58 deletions(-)
+ rename ts/test-node/util/{isVesperAuthor_test.std.ts => isVesperAuthor_test.dom.ts} (93%)
+ rename ts/util/{isVesperAuthor.std.ts => isVesperAuthor.dom.ts} (89%)
+
+diff --git a/stylesheets/manifest.scss b/stylesheets/manifest.scss
+index 0c731ae41..a50e99efc 100644
+--- a/stylesheets/manifest.scss
++++ b/stylesheets/manifest.scss
+@@ -30,6 +30,8 @@ $is-storybook: false !default;
+ @use 'components/BackupMediaDownloadProgress.scss';
+ @use 'components/BackupMediaDownloadProgressSettings.scss';
+ @use 'components/BadgeCarouselIndex.scss';
++@use 'components/BrandTheme.scss';
++@use 'components/VesperTitleBar.scss';
+ @use 'components/BetterAvatarBubble.scss';
+ @use 'components/Button.scss';
+ @use 'components/CallsTab.scss';
+diff --git a/ts/VesperConfig.dom.ts b/ts/VesperConfig.dom.ts
+index 4ac3c91db..0e877f802 100644
+--- a/ts/VesperConfig.dom.ts
++++ b/ts/VesperConfig.dom.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import * as Bytes from './Bytes.std.ts';
+diff --git a/ts/axo/_tailwind-theme/colors.css b/ts/axo/_tailwind-theme/colors.css
+index 6b8f10633..c1cc6061a 100644
+--- a/ts/axo/_tailwind-theme/colors.css
++++ b/ts/axo/_tailwind-theme/colors.css
+@@ -467,7 +467,7 @@
+   --axo-color-border-primary:               light-dark(--alpha(#000000 / 6%), --alpha(#ffffff / 6%));
+   --axo-color-border-secondary:             light-dark(--alpha(#000000 / 12%), --alpha(#ffffff / 12%));
+   --axo-color-border-tertiary:              light-dark(--alpha(#000000 / 24%), --alpha(#ffffff / 24%));
+-  --axo-color-border-selected:              light-dark(#7152ff, #c9ceff);
++  --axo-color-border-selected:              light-dark(#7152ff, #c8bdff);
+   --axo-color-border-selected-oncolor:      light-dark(#f6f6ff, #f6f6ff);
+   --axo-color-border-focused-inner:         light-dark(#ffffff, #000000);
+   --axo-color-border-focused-outer:         light-dark(#808190, #c9cbda);
+diff --git a/ts/background.preload.ts b/ts/background.preload.ts
+index fdc78af18..c70824ddd 100644
+--- a/ts/background.preload.ts
++++ b/ts/background.preload.ts
+@@ -568,18 +568,21 @@ async function startApp(): Promise<void> {
+     restoreRemoteConfigFromStorage({
+       storage: itemStorage,
+     });
+-    drop(
+-      maybeRefreshVesperConfig({
+-        aci: itemStorage.user.getAci(),
+-        isInternalUser: isRemoteConfigValueEnabled('desktop.internalUser'),
+-        storage: itemStorage,
+-      }).catch(error => {
++    const refreshVesperConfig = async (): Promise<void> => {
++      try {
++        await maybeRefreshVesperConfig({
++          aci: itemStorage.user.getAci(),
++          isInternalUser: isRemoteConfigValueEnabled('desktop.internalUser'),
++          storage: itemStorage,
++        });
++      } catch (error) {
+         log.warn(
+           'Unable to refresh cached Vesper config',
+           Errors.toLogFormat(error)
+         );
+-      })
+-    );
++      }
++    };
++    drop(refreshVesperConfig());
+ 
+     MessageCache.install();
+     initMessageCleanup();
+diff --git a/ts/components/Preferences.dom.tsx b/ts/components/Preferences.dom.tsx
+index 0a3a84e66..e140fe1bf 100644
+--- a/ts/components/Preferences.dom.tsx
++++ b/ts/components/Preferences.dom.tsx
+@@ -63,7 +63,7 @@ import type {
+   NotifyWhileMutedKey,
+ } from '../util/notifyWhileMuted.std.ts';
+ import { getNotifyWhileMutedSummary } from '../util/notifyWhileMuted.std.ts';
+-import type { ThemeSettingType } from '../util/theme.std.ts';
++import type { BrandThemeType, ThemeSettingType } from '../util/theme.std.ts';
+ import type { AnyToast } from '../types/Toast.dom.tsx';
+ import { ToastType } from '../types/Toast.dom.tsx';
+ import type { ConversationType } from '../state/ducks/conversations.preload.ts';
+@@ -195,6 +195,7 @@ export type PropsDataType = {
+   selectedMicrophone?: AudioDevice;
+   selectedSpeaker?: AudioDevice;
+   sentMediaQualitySetting: SentMediaQualitySettingType;
++  brandTheme: BrandThemeType | undefined;
+   themeSetting: ThemeSettingType | undefined;
+   universalExpireTimer: DurationInSeconds;
+   unreadCountBadgeType: UnreadCountBadgeType;
+@@ -652,6 +653,7 @@ export function Preferences({
+   startPlaintextExport,
+   localeOverride,
+   theme,
++  brandTheme,
+   themeSetting,
+   universalExpireTimer,
+   unreadCountBadgeType,
+@@ -1033,25 +1035,18 @@ export function Preferences({
+             label={i18n('icu:Preferences--device-name')}
+             value={deviceName}
+           />
+-          <Control
+-            left={i18n('icu:Vesper__Settings__Version')}
+-            right={
+-              <AxoButton.Root
+-                variant="subtle-secondary"
+-                size="md"
+-                onClick={() => {
+-                  const nextTapCount = versionTapCount + 1;
+-                  if (nextTapCount >= 7) {
+-                    setVersionTapCount(0);
+-                    onToggleInternalSettings();
+-                  } else {
+-                    setVersionTapCount(nextTapCount);
+-                  }
+-                }}
+-              >
+-                {version}
+-              </AxoButton.Root>
+-            }
++          <AxoClickableItem.Root
++            label={i18n('icu:Vesper__Settings__Version')}
++            value={version}
++            onClick={() => {
++              const nextTapCount = versionTapCount + 1;
++              if (nextTapCount >= 7) {
++                setVersionTapCount(0);
++                onToggleInternalSettings();
++              } else {
++                setVersionTapCount(nextTapCount);
++              }
++            }}
+           />
+         </PreferencesList>
+         {weArePrimaryDevice && (
+@@ -1411,6 +1406,17 @@ export function Preferences({
+               </AxoConfirmDialog.Action>
+             </AxoConfirmDialog.Root>
+           )}
++          <AxoSelectItem.Root
++            label={i18n('icu:Preferences--colour-palette')}
++            placeholder=""
++            disabled={brandTheme === undefined}
++            value={brandTheme ?? 'vesper'}
++            onValueChange={value => onBrandThemeChange(value as BrandThemeType)}
++            options={[
++              { label: i18n('icu:Preferences--colour-palette-vesper'), value: 'vesper' },
++              { label: i18n('icu:Preferences--colour-palette-signal'), value: 'signal' },
++            ]}
++          />
+           <AxoSelectItem.Root
+             symbol="contrast"
+             label={i18n('icu:Preferences--theme')}
+@@ -2093,17 +2099,15 @@ export function Preferences({
+           </AxoConfirmDialog.Root>
+         ) : null}
+         {/* Vesper's logging controls follow Molly commits 794df8f8 and d6cc48d6. */}
+-        <SettingsRow title={i18n('icu:Vesper__Settings__Section')}>
+-          <Checkbox
+-            checked={hasDebugLogging}
++        <List label={i18n('icu:Vesper__Settings__Section')}>
++          <AxoSwitchItem.Root
++            checked={hasDebugLogging ?? false}
+             disabled={hasDebugLogging === undefined}
+             description={i18n(
+               'icu:Vesper__Settings__DebugLogging__Description'
+             )}
+             label={i18n('icu:Vesper__Settings__DebugLogging__Label')}
+-            moduleClassName="Preferences__checkbox"
+-            name="debugLogging"
+-            onChange={value => {
++            onCheckedChange={value => {
+               if (value) {
+                 onDebugLoggingChange(true);
+               } else {
+@@ -2111,15 +2115,13 @@ export function Preferences({
+               }
+             }}
+           />
+-          <Checkbox
++          <AxoSwitchItem.Root
+             checked={hasKeepDeletedMessages}
+             description={i18n(
+               'icu:Vesper__Settings__KeepDeletedMessages__Description'
+             )}
+             label={i18n('icu:Vesper__Settings__KeepDeletedMessages__Label')}
+-            moduleClassName="Preferences__checkbox"
+-            name="keepDeletedMessages"
+-            onChange={value => {
++            onCheckedChange={value => {
+               if (value) {
+                 setConfirmKeepDeletedMessages(true);
+               } else {
+@@ -2127,7 +2129,7 @@ export function Preferences({
+               }
+             }}
+           />
+-        </SettingsRow>
++        </List>
+         <AxoConfirmDialog.Root
+           open={confirmDebugLoggingOff}
+           onOpenChange={setConfirmDebugLoggingOff}
+diff --git a/ts/components/StoryListItem.dom.tsx b/ts/components/StoryListItem.dom.tsx
+index 567da7c4b..ce33c3d35 100644
+--- a/ts/components/StoryListItem.dom.tsx
++++ b/ts/components/StoryListItem.dom.tsx
+@@ -20,7 +20,7 @@ import { StoryImage } from './StoryImage.dom.tsx';
+ import { getAvatarColor } from '../types/Colors.std.ts';
+ import { OfficialChatInlineBadge } from './conversation/OfficialChatInlineBadge.dom.tsx';
+ import { AxoConfirmDialog } from '../axo/AxoConfirmDialog.dom.tsx';
+-import { isVesperAuthor } from '../util/isVesperAuthor.std.ts';
++import { isVesperAuthor } from '../util/isVesperAuthor.dom.ts';
+ 
+ export type PropsType = Pick<ConversationStoryType, 'group' | 'isHidden'> & {
+   conversationId: string;
+diff --git a/ts/components/VesperTitleBar.dom.tsx b/ts/components/VesperTitleBar.dom.tsx
+index 37915761a..1f3f84882 100644
+--- a/ts/components/VesperTitleBar.dom.tsx
++++ b/ts/components/VesperTitleBar.dom.tsx
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import type {
+diff --git a/ts/components/conversation/AboutContactModal.dom.tsx b/ts/components/conversation/AboutContactModal.dom.tsx
+index 7a3305873..d3647540e 100644
+--- a/ts/components/conversation/AboutContactModal.dom.tsx
++++ b/ts/components/conversation/AboutContactModal.dom.tsx
+@@ -15,7 +15,7 @@ import { missingEmojiPlaceholder } from '../../types/GroupMemberLabels.std.ts';
+ import type { ConversationType } from '../../state/ducks/conversations.preload.ts';
+ import type { LocalizerType } from '../../types/Util.std.ts';
+ import { OfficialChatInlineBadge } from './OfficialChatInlineBadge.dom.tsx';
+-import { isVesperAuthor } from '../../util/isVesperAuthor.std.ts';
++import { isVesperAuthor } from '../../util/isVesperAuthor.dom.ts';
+ import { Emoji } from '../../axo/emoji.std.ts';
+ import { AxoDialog } from '../../axo/AxoDialog.dom.tsx';
+ import { tw } from '../../axo/tw.dom.tsx';
+diff --git a/ts/components/conversation/ContactName.dom.tsx b/ts/components/conversation/ContactName.dom.tsx
+index ec8a317d8..2ff4f1557 100644
+--- a/ts/components/conversation/ContactName.dom.tsx
++++ b/ts/components/conversation/ContactName.dom.tsx
+@@ -19,7 +19,7 @@ import { OfficialChatInlineBadge } from './OfficialChatInlineBadge.dom.tsx';
+ import { Emoji } from '../../axo/emoji.std.ts';
+ import { AxoTokens } from '../../axo/AxoTokens.std.ts';
+ import type { ServiceIdString } from '../../types/ServiceId.std.ts';
+-import { isVesperAuthor } from '../../util/isVesperAuthor.std.ts';
++import { isVesperAuthor } from '../../util/isVesperAuthor.dom.ts';
+ 
+ export type ContactNameData = {
+   contactNameColor?: ContactNameColorType;
+diff --git a/ts/components/conversation/ConversationHeader.dom.tsx b/ts/components/conversation/ConversationHeader.dom.tsx
+index 48bfb14b3..730b8fef1 100644
+--- a/ts/components/conversation/ConversationHeader.dom.tsx
++++ b/ts/components/conversation/ConversationHeader.dom.tsx
+@@ -63,7 +63,7 @@ import { AxoDragRegion } from '../../axo/AxoDragRegion.dom.tsx';
+ import { OfficialChatInlineBadge } from './OfficialChatInlineBadge.dom.tsx';
+ import { AxoIconButton } from '../../axo/AxoIconButton.dom.tsx';
+ import { AxoButton } from '../../axo/AxoButton.dom.tsx';
+-import { isVesperAuthor } from '../../util/isVesperAuthor.std.ts';
++import { isVesperAuthor } from '../../util/isVesperAuthor.dom.ts';
+ import { AxoConfirmDialog } from '../../axo/AxoConfirmDialog.dom.tsx';
+ import { getControlOrAltKey } from '../../hooks/useKeyboardShortcuts.dom.tsx';
+ 
+diff --git a/ts/components/conversation/GroupV1Migration.dom.tsx b/ts/components/conversation/GroupV1Migration.dom.tsx
+index 96feaa005..a24e8d559 100644
+--- a/ts/components/conversation/GroupV1Migration.dom.tsx
++++ b/ts/components/conversation/GroupV1Migration.dom.tsx
+@@ -127,13 +127,10 @@ function renderUsers({
+     return null;
+   }
+ 
+-  if (members && count === 1) {
+-    // oxlint-disable-next-line typescript/no-non-null-assertion
++  const member = members?.[0];
++  if (member && count === 1) {
+     const contact = (
+-      <ContactName
+-        serviceId={members[0]!.serviceId}
+-        title={members[0]!.title}
+-      />
++      <ContactName serviceId={member.serviceId} title={member.title} />
+     );
+     return (
+       <p>
+diff --git a/ts/components/conversation/conversation-details/ConversationDetailsHeader.dom.tsx b/ts/components/conversation/conversation-details/ConversationDetailsHeader.dom.tsx
+index 00c9415ab..a2ff6807f 100644
+--- a/ts/components/conversation/conversation-details/ConversationDetailsHeader.dom.tsx
++++ b/ts/components/conversation/conversation-details/ConversationDetailsHeader.dom.tsx
+@@ -20,7 +20,7 @@ import type { ContactModalStateType } from '../../../types/globalModals.std.ts';
+ import { tw } from '../../../axo/tw.dom.tsx';
+ import { AxoSymbol } from '../../../axo/AxoSymbol.dom.tsx';
+ import { OfficialChatInlineBadge } from '../OfficialChatInlineBadge.dom.tsx';
+-import { isVesperAuthor } from '../../../util/isVesperAuthor.std.ts';
++import { isVesperAuthor } from '../../../util/isVesperAuthor.dom.ts';
+ 
+ export type Props = {
+   areWeASubscriber: boolean;
+diff --git a/ts/state/smart/Preferences.preload.tsx b/ts/state/smart/Preferences.preload.tsx
+index d671bf4fa..13fc32212 100644
+--- a/ts/state/smart/Preferences.preload.tsx
++++ b/ts/state/smart/Preferences.preload.tsx
+@@ -1095,6 +1095,7 @@ export function SmartPreferences(): JSX.Element | null {
+         hasKeepDeletedMessages={hasKeepDeletedMessages}
+         hasCallRingtoneNotification={hasCallRingtoneNotification}
+         hasContentProtection={hasContentProtection}
++        hasDebugLogging={hasDebugLogging}
+         hasCountMutedConversations={hasCountMutedConversations}
+         hasFailedStorySends={hasFailedStorySends}
+         hasHideMenuBar={hasHideMenuBar}
+@@ -1154,6 +1155,7 @@ export function SmartPreferences(): JSX.Element | null {
+         onBackupKeyViewed={onBackupKeyViewed}
+         onCallRingtoneNotificationChange={onCallRingtoneNotificationChange}
+         onContentProtectionChange={onContentProtectionChange}
++        onDebugLoggingChange={onDebugLoggingChange}
+         onCountMutedConversationsChange={onCountMutedConversationsChange}
+         onEmojiSkinToneDefaultChange={onEmojiSkinToneDefaultChange}
+         onHasKeyTransparencyDisabledChanged={
+diff --git a/ts/test-node/VesperConfig_test.dom.ts b/ts/test-node/VesperConfig_test.dom.ts
+index b9573af19..ee1a5e64f 100644
+--- a/ts/test-node/VesperConfig_test.dom.ts
++++ b/ts/test-node/VesperConfig_test.dom.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import { assert } from 'chai';
+@@ -95,7 +95,13 @@ describe('VesperConfig', () => {
+     };
+     let requestedUrl: string | undefined;
+     const fetchFn: typeof fetch = async input => {
+-      requestedUrl = String(input);
++      if (typeof input === 'string') {
++        requestedUrl = input;
++      } else if (input instanceof URL) {
++        requestedUrl = input.href;
++      } else {
++        requestedUrl = input.url;
++      }
+       return Response.json(
+         {
+           schemaVersion: 1,
+diff --git a/ts/test-node/util/isVesperAuthor_test.std.ts b/ts/test-node/util/isVesperAuthor_test.dom.ts
+similarity index 93%
+rename from ts/test-node/util/isVesperAuthor_test.std.ts
+rename to ts/test-node/util/isVesperAuthor_test.dom.ts
+index 4aefbc2de..e5f7c7205 100644
+--- a/ts/test-node/util/isVesperAuthor_test.std.ts
++++ b/ts/test-node/util/isVesperAuthor_test.dom.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import { assert } from 'chai';
+@@ -8,7 +8,7 @@ import {
+   generateAci,
+   generatePni,
+ } from '../../test-helpers/serviceIdUtils.std.ts';
+-import { isVesperAuthor } from '../../util/isVesperAuthor.std.ts';
++import { isVesperAuthor } from '../../util/isVesperAuthor.dom.ts';
+ import {
+   hashVesperAci,
+   restoreVesperConfigFromStorage,
+diff --git a/ts/util/createIPCEvents.preload.ts b/ts/util/createIPCEvents.preload.ts
+index 857213b49..f445a7662 100644
+--- a/ts/util/createIPCEvents.preload.ts
++++ b/ts/util/createIPCEvents.preload.ts
+@@ -37,6 +37,7 @@ import { SystemTraySetting } from '../types/SystemTraySetting.std.ts';
+ import { putStickers } from '../textsecure/WebAPI.preload.ts';
+ import type { PDFWindowPropsType } from '../windows/pdf/types.std.ts';
+ import OS from './os/osPreload.preload.ts';
++import type { BrandThemeType } from './theme.std.ts';
+ 
+ const { noop } = lodash;
+ 
+diff --git a/ts/util/isVesperAuthor.std.ts b/ts/util/isVesperAuthor.dom.ts
+similarity index 89%
+rename from ts/util/isVesperAuthor.std.ts
+rename to ts/util/isVesperAuthor.dom.ts
+index cfc9c50d9..8a4d5380d 100644
+--- a/ts/util/isVesperAuthor.std.ts
++++ b/ts/util/isVesperAuthor.dom.ts
+@@ -1,4 +1,4 @@
+-// Copyright 2026 Vesper contributors
++// Copyright 2026 amber
+ // SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import type { ServiceIdString } from '../types/ServiceId.std.ts';
+diff --git a/ts/window.d.ts b/ts/window.d.ts
+index 0fbf7fab2..8cf171492 100644
+--- a/ts/window.d.ts
++++ b/ts/window.d.ts
+@@ -28,6 +28,17 @@ import type { SocketStatuses } from './textsecure/SocketManager.preload.ts';
+ import type { SignalClipboardType } from './windows/clipboard.preload.ts';
+ import type { PDFWindowPropsType } from './windows/pdf/types.std.ts';
+ 
++export type TitleBarMenuItemType = Readonly<{
++  index: number;
++  label: string;
++}>;
++
++export type TitleBarStateType = Readonly<{
++  isCustomTitleBar: boolean;
++  menuItems: ReadonlyArray<TitleBarMenuItemType>;
++  menuVisible: boolean;
++}>;
++
+ export type IPCType = {
+   addSetupMenuItems: () => void;
+   clearAllWindowsNotifications: () => Promise<void>;
+diff --git a/ts/windows/main/phase1-ipc.preload.ts b/ts/windows/main/phase1-ipc.preload.ts
+index 5d5eef1cf..bed86d0e9 100644
+--- a/ts/windows/main/phase1-ipc.preload.ts
++++ b/ts/windows/main/phase1-ipc.preload.ts
+@@ -145,6 +145,12 @@ const IPC: IPCType = {
+   removeSetupMenuItems: () => ipc.send('remove-setup-menu-items'),
+   setAutoHideMenuBar: autoHide => ipc.send('set-auto-hide-menu-bar', autoHide),
+   setAutoLaunch: value => ipc.invoke('set-auto-launch', value),
++  onTitleBarMenuVisibilityChange: callback => {
++    titleBarMenuVisibilityCallbacks.add(callback);
++    return () => titleBarMenuVisibilityCallbacks.delete(callback);
++  },
++  popupTitleBarMenu: (index, x, y) =>
++    ipc.invoke('titlebar:popup-menu', index, x, y),
+   setBadgeCount: badgeCount => ipc.send('set-badge-count', badgeCount),
+   setMenuBarVisibility: visibility =>
+     ipc.send('set-menu-bar-visibility', visibility),

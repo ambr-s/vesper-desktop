@@ -1,0 +1,100 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Sun, 25 Oct 2026 21:48:05 +0000
+Subject: [PATCH 24/26] fix: retain themed legacy controls with upstream focus
+ rings
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ stylesheets/components/Checkbox.scss | 44 ++++++++++++++++++++++++++++
+ stylesheets/components/Select.scss   | 14 +++++----
+ 2 files changed, 52 insertions(+), 6 deletions(-)
+
+diff --git a/stylesheets/components/Checkbox.scss b/stylesheets/components/Checkbox.scss
+index f13b721b1..e6f47af64 100644
+--- a/stylesheets/components/Checkbox.scss
++++ b/stylesheets/components/Checkbox.scss
+@@ -10,9 +10,53 @@
+     display: flex;
+ 
+     input {
++      appearance: none;
++      background-color: var(--axo-color-fill-control);
++      border: 1.5px solid var(--axo-color-border-tertiary);
++      border-radius: 3px;
++      cursor: pointer;
+       height: 18px;
++      margin: 0;
++      position: relative;
++      transition:
++        background-color 100ms ease,
++        border-color 100ms ease;
+       width: 18px;
+ 
++      &::after {
++        background-color: var(--axo-color-label-primary-oncolor);
++        content: '';
++        inset: 1px;
++        mask: url('../images/icons/v3/check/check-compact-bold.svg') center /
++          14px no-repeat;
++        opacity: 0;
++        position: absolute;
++      }
++
++      &:checked {
++        background-color: var(--axo-color-fill-accent);
++        border-color: var(--axo-color-fill-accent);
++
++        &::after {
++          opacity: 1;
++        }
++      }
++
++      &[type='radio'] {
++        border-radius: 50%;
++
++        &::after {
++          border-radius: 50%;
++          inset: 4px;
++          mask: none;
++        }
++      }
++
++      &:disabled {
++        cursor: default;
++        opacity: 0.45;
++      }
++
+       &:focus-visible {
+         @include mixins.axo-focus-ring;
+       }
+diff --git a/stylesheets/components/Select.scss b/stylesheets/components/Select.scss
+index 345b9903c..43cd9460a 100644
+--- a/stylesheets/components/Select.scss
++++ b/stylesheets/components/Select.scss
+@@ -19,17 +19,19 @@
+     padding-inline: 12px 32px;
+     text-overflow: ellipsis;
+     width: 100%;
+-    color: variables.$color-black;
++    background-color: var(--axo-color-surface-secondary);
++    border-color: var(--axo-color-border-tertiary);
++    color: var(--axo-color-label-primary);
+ 
+-    @include mixins.dark-theme {
+-      background-color: variables.$color-gray-90;
+-      border-color: variables.$color-gray-60;
+-      color: variables.$color-gray-05;
++    &:disabled {
++      color: var(--axo-color-label-disabled);
++      cursor: default;
++      opacity: 0.7;
+     }
+ 
+     &:focus-visible {
+       outline: none;
+-      border: 3px solid variables.$color-ultramarine;
++      border: 3px solid var(--axo-color-border-selected);
+       line-height: 14px;
+       padding-inline-start: 10px;
+     }
