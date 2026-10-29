@@ -25,11 +25,12 @@ same checks.
 
 ### Signal v8.33 candidate
 
-The published v8.32.0 pin and `patches/signal-8.32/` remain unchanged.
-`patches/signal-8.33/` carries the candidate rebase, selected by the actual
-upstream tag. The artifact-only build matrix qualifies both the pin and
-v8.33.0, including Debian, AppImage, Flatpak and encrypted-key restart tests.
-Do not advance the pin until both complete jobs pass.
+The v8.33.0 candidate and the previous v8.32.0 pin passed the complete
+artifact-only gate in run `40845745713` before advancing `upstream.pin`.
+`patches/signal-8.33/` carries the rebase, selected by the actual upstream tag;
+`patches/signal-8.32/` remains byte-identical for reproducibility. The final
+pin commit must also pass both build jobs, including Debian, AppImage,
+Flatpak and encrypted-key restart tests. Pin advancement is not publication.
 
 The candidate preserves upstream's `PreferencesList`, contact-name class API,
 static class-name checks and theme helper overload. Removed unused gradient
