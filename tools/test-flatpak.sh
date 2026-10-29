@@ -56,6 +56,13 @@ BUNDLE="$ROOT/artifacts/flatpak/vesper-desktop_${VERSION}_x86_64.flatpak"
   exit 1
 }
 
+SOURCE_COMMIT_TIME="$(git -C "$WORK" show -s --format=%ct HEAD)"
+python3 "$ROOT/tools/flatpak_metadata.py" verify \
+  --work "$WORK" \
+  --asar "$BUILD_DIR/files/Vesper/resources/app.asar" \
+  --metadata "$BUILD_DIR/files/share/metainfo/$APP_ID.metainfo.xml" \
+  --epoch "$SOURCE_COMMIT_TIME"
+
 # Expand these paths and variables inside the Flatpak sandbox.
 # shellcheck disable=SC2016
 flatpak build --readonly "$BUILD_DIR" sh -c '
@@ -119,6 +126,12 @@ flatpak install \
   --no-deps \
   "$BUNDLE"
 flatpak info --user "$APP_ID" >/dev/null
+INSTALLED_LOCATION="$(flatpak info --user --show-location "$APP_ID")"
+python3 "$ROOT/tools/flatpak_metadata.py" verify \
+  --work "$WORK" \
+  --asar "$INSTALLED_LOCATION/files/Vesper/resources/app.asar" \
+  --metadata "$INSTALLED_LOCATION/files/share/metainfo/$APP_ID.metainfo.xml" \
+  --epoch "$SOURCE_COMMIT_TIME"
 
 run_smoke() {
   local log_file="$1"
