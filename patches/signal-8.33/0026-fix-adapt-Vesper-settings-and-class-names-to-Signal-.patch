@@ -1,0 +1,150 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Thu, 29 Oct 2026 08:46:48 +0000
+Subject: [PATCH 26/26] fix: adapt Vesper settings and class names to Signal
+ v8.33
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ ts/background.preload.ts                  | 1 -
+ ts/components/App.dom.tsx                 | 2 --
+ ts/components/Preferences.dom.tsx         | 4 ++--
+ ts/components/VesperTitleBar.dom.tsx      | 6 ++++--
+ ts/components/fun/base/FunPopover.dom.tsx | 1 -
+ ts/util/theme.std.ts                      | 3 +--
+ ts/windows/applyTheme.dom.ts              | 2 --
+ 7 files changed, 7 insertions(+), 12 deletions(-)
+
+diff --git a/ts/background.preload.ts b/ts/background.preload.ts
+index c70824ddd..7010f79b8 100644
+--- a/ts/background.preload.ts
++++ b/ts/background.preload.ts
+@@ -335,7 +335,6 @@ export async function cleanupSessionResets(): Promise<void> {
+ 
+ async function startApp(): Promise<void> {
+   if (window.initialTheme === ThemeType.light) {
+-    // oxlint-disable-next-line signal-desktop/enforce-class-name-has-styles
+     document.body.classList.add('light-theme');
+   }
+   if (window.initialTheme === ThemeType.dark) {
+diff --git a/ts/components/App.dom.tsx b/ts/components/App.dom.tsx
+index e64905a43..b6393f08a 100644
+--- a/ts/components/App.dom.tsx
++++ b/ts/components/App.dom.tsx
+@@ -78,7 +78,6 @@ export function App({
+   // This are here so that themes are properly applied to anything that is
+   // created in a portal and exists outside of the <App /> container.
+   useEffect(() => {
+-    // oxlint-disable-next-line signal-desktop/enforce-class-name-has-styles
+     document.body.classList.remove('light-theme');
+     document.body.classList.remove('dark-theme');
+ 
+@@ -86,7 +85,6 @@ export function App({
+       document.body.classList.add('dark-theme');
+     }
+     if (theme === ThemeType.light) {
+-      // oxlint-disable-next-line signal-desktop/enforce-class-name-has-styles
+       document.body.classList.add('light-theme');
+     }
+   }, [theme]);
+diff --git a/ts/components/Preferences.dom.tsx b/ts/components/Preferences.dom.tsx
+index 060879804..b54a95448 100644
+--- a/ts/components/Preferences.dom.tsx
++++ b/ts/components/Preferences.dom.tsx
+@@ -2106,7 +2106,7 @@ export function Preferences({
+           </AxoConfirmDialog.Root>
+         ) : null}
+         {/* Vesper's logging controls follow Molly commits 794df8f8 and d6cc48d6. */}
+-        <List label={i18n('icu:Vesper__Settings__Section')}>
++        <PreferencesList label={i18n('icu:Vesper__Settings__Section')}>
+           <AxoSwitchItem.Root
+             checked={hasDebugLogging ?? false}
+             disabled={hasDebugLogging === undefined}
+@@ -2136,7 +2136,7 @@ export function Preferences({
+               }
+             }}
+           />
+-        </List>
++        </PreferencesList>
+         <AxoConfirmDialog.Root
+           open={confirmDebugLoggingOff}
+           onOpenChange={setConfirmDebugLoggingOff}
+diff --git a/ts/components/VesperTitleBar.dom.tsx b/ts/components/VesperTitleBar.dom.tsx
+index 756b0c6bf..c1ceb4a79 100644
+--- a/ts/components/VesperTitleBar.dom.tsx
++++ b/ts/components/VesperTitleBar.dom.tsx
+@@ -7,6 +7,7 @@ import type {
+   MouseEvent as ReactMouseEvent,
+ } from 'react';
+ import { useEffect, useRef, useState } from 'react';
++import classNames from 'classnames';
+ 
+ import { AxoDragRegion } from '../axo/AxoDragRegion.dom.tsx';
+ import type { TitleBarMenuItemType } from '../window.d.ts';
+@@ -167,11 +168,12 @@ export function VesperTitleBar({ isMaximized }: PropsType): JSX.Element {
+                 ? i18n('icu:VesperTitleBar--restore')
+                 : i18n('icu:windowMenuZoom')
+             }
+-            className={`VesperTitleBar__control ${
++            className={classNames(
++              'VesperTitleBar__control',
+               isMaximized
+                 ? 'VesperTitleBar__control--restore'
+                 : 'VesperTitleBar__control--maximize'
+-            }`}
++            )}
+             onClick={() => {
+               void window.IPC.titleBarWindowAction('toggle-maximize');
+             }}
+diff --git a/ts/components/fun/base/FunPopover.dom.tsx b/ts/components/fun/base/FunPopover.dom.tsx
+index 888581fbf..299a3d49d 100644
+--- a/ts/components/fun/base/FunPopover.dom.tsx
++++ b/ts/components/fun/base/FunPopover.dom.tsx
+@@ -38,7 +38,6 @@ export function FunPopover(props: FunPopoverProps): JSX.Element {
+       <Popover
+         data-fun-overlay
+         className={classNames('FunPopover', {
+-          // oxlint-disable-next-line signal-desktop/enforce-class-name-has-styles
+           'light-theme': props.theme === ThemeType.light,
+           'dark-theme': props.theme === ThemeType.dark,
+         })}
+diff --git a/ts/util/theme.std.ts b/ts/util/theme.std.ts
+index 46e15a456..bd7fd1455 100644
+--- a/ts/util/theme.std.ts
++++ b/ts/util/theme.std.ts
+@@ -17,14 +17,13 @@ export const brandThemeSchema = z.enum(['vesper', 'signal']);
+ export type BrandThemeType = z.infer<typeof brandThemeSchema>;
+ 
+ export function brandThemeClassName(brandTheme: BrandThemeType): string {
+-  return `${brandTheme}-brand-theme`;
++  return brandTheme === 'signal' ? 'signal-brand-theme' : 'vesper-brand-theme';
+ }
+ 
+ export function themeClassName(theme: Theme | ThemeType): string {
+   switch (theme) {
+     case ThemeType.light:
+     case Theme.Light:
+-      // oxlint-disable-next-line signal-desktop/enforce-class-name-has-styles
+       return 'light-theme';
+     case ThemeType.dark:
+     case Theme.Dark:
+diff --git a/ts/windows/applyTheme.dom.ts b/ts/windows/applyTheme.dom.ts
+index 912cc3f3c..0260e5d58 100644
+--- a/ts/windows/applyTheme.dom.ts
++++ b/ts/windows/applyTheme.dom.ts
+@@ -9,7 +9,6 @@ async function applyTheme() {
+     window.SignalContext.Settings.brandTheme.getValue(),
+   ]);
+ 
+-  // oxlint-disable-next-line signal-desktop/enforce-class-name-has-styles
+   document.body.classList.remove('light-theme');
+   document.body.classList.remove('dark-theme');
+   document.body.classList.remove(
+@@ -26,7 +25,6 @@ async function applyTheme() {
+   }
+ 
+   if (theme === 'light') {
+-    // oxlint-disable-next-line signal-desktop/enforce-class-name-has-styles
+     document.body.classList.add('light-theme');
+   } else if (theme === 'dark') {
+     document.body.classList.add('dark-theme');

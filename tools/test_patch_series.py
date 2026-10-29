@@ -14,7 +14,7 @@ class PatchSeriesTest(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = pathlib.Path(self.temporary.name)
-        for directory in ("patches", "patches/signal-8.32"):
+        for directory in ("patches", "patches/signal-8.32", "patches/signal-8.33"):
             path = self.root / directory
             path.mkdir(exist_ok=True)
             (path / "0001.patch").write_text("fixture")
@@ -24,11 +24,22 @@ class PatchSeriesTest(unittest.TestCase):
             with self.subTest(tag=tag):
                 self.assertEqual(series_path(self.root, tag), self.root / "patches")
 
-    def test_candidate_and_newer_use_rebased_series(self):
-        for tag in ("v8.32.0", "v8.32.1", "v8.33.0", "v9.0.0"):
+    def test_published_832_keeps_its_series(self):
+        for tag in ("v8.32.0", "v8.32.1"):
             with self.subTest(tag=tag):
                 self.assertEqual(series_path(self.root, tag),
                                  self.root / "patches/signal-8.32")
+
+    def test_833_and_newer_use_rebased_series(self):
+        for tag in ("v8.33.0", "v8.33.1", "v9.0.0"):
+            with self.subTest(tag=tag):
+                self.assertEqual(series_path(self.root, tag),
+                                 self.root / "patches/signal-8.33")
+
+    def test_missing_833_never_falls_back_to_published_series(self):
+        (self.root / "patches/signal-8.33/0001.patch").unlink()
+        with self.assertRaisesRegex(ValueError, "empty"):
+            series_path(self.root, "v8.33.0")
 
     def test_reject_malformed_tags(self):
         for tag in ("8.32.0", "v8.32", "v8.32.0-beta", "v8.32.0\n", "../v8.32.0"):

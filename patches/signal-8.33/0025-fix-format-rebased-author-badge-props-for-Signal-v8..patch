@@ -1,0 +1,222 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Thu, 29 Oct 2026 08:43:00 +0000
+Subject: [PATCH 25/26] fix: format rebased author badge props for Signal v8.33
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ ts/components/CallingParticipantListItem.dom.tsx          | 3 ++-
+ ts/components/CallingPendingParticipants.dom.tsx          | 3 ++-
+ ts/components/CallingRaisedHandsList.dom.tsx              | 3 ++-
+ ts/components/ContactPill.dom.tsx                         | 3 ++-
+ ts/components/GroupCallRemoteParticipant.dom.tsx          | 3 ++-
+ ts/components/GroupDialog.dom.tsx                         | 3 ++-
+ .../ContactSpoofingReviewDialogPerson.dom.tsx             | 3 ++-
+ .../conversation/SafetyNumberNotification.dom.tsx         | 8 +++++++-
+ .../conversation/VerificationNotification.dom.tsx         | 8 +++++++-
+ .../conversation/poll-message/PollVotesModal.dom.tsx      | 3 ++-
+ ts/components/conversationList/ContactCheckbox.dom.tsx    | 6 ++++--
+ ts/components/conversationList/ContactListItem.dom.tsx    | 3 ++-
+ .../conversationList/ConversationListItem.dom.tsx         | 3 ++-
+ 13 files changed, 38 insertions(+), 14 deletions(-)
+
+diff --git a/ts/components/CallingParticipantListItem.dom.tsx b/ts/components/CallingParticipantListItem.dom.tsx
+index c89200625..aa95cd61c 100644
+--- a/ts/components/CallingParticipantListItem.dom.tsx
++++ b/ts/components/CallingParticipantListItem.dom.tsx
+@@ -132,7 +132,8 @@ export function CallingParticipantListItem({
+         ) : (
+           <div className={tw('min-w-0')}>
+             <div className={tw('min-w-0 truncate')}>
+-              <ContactName serviceId={participant.serviceId}
++              <ContactName
++                serviceId={participant.serviceId}
+                 className="module-calling-participants-list__name"
+                 title={participant.title}
+               />
+diff --git a/ts/components/CallingPendingParticipants.dom.tsx b/ts/components/CallingPendingParticipants.dom.tsx
+index 64b3012ca..028458e1e 100644
+--- a/ts/components/CallingPendingParticipants.dom.tsx
++++ b/ts/components/CallingPendingParticipants.dom.tsx
+@@ -273,7 +273,8 @@ export function CallingPendingParticipants({
+                   title={participant.title}
+                   size={AvatarSize.THIRTY_SIX}
+                 />
+-                <ContactName serviceId={participant.serviceId}
++                <ContactName
++                  serviceId={participant.serviceId}
+                   className="module-calling-participants-list__name"
+                   title={participant.title}
+                 />
+diff --git a/ts/components/CallingRaisedHandsList.dom.tsx b/ts/components/CallingRaisedHandsList.dom.tsx
+index 65cf3261e..de5aa65f1 100644
+--- a/ts/components/CallingRaisedHandsList.dom.tsx
++++ b/ts/components/CallingRaisedHandsList.dom.tsx
+@@ -122,7 +122,8 @@ export function CallingRaisedHandsList({
+                       {i18n('icu:you')}
+                     </span>
+                   ) : (
+-                    <ContactName serviceId={conversation.serviceId}
++                    <ContactName
++                      serviceId={conversation.serviceId}
+                       className="module-calling-participants-list__name"
+                       title={conversation.title}
+                     />
+diff --git a/ts/components/ContactPill.dom.tsx b/ts/components/ContactPill.dom.tsx
+index 5718da67b..2daa52bc2 100644
+--- a/ts/components/ContactPill.dom.tsx
++++ b/ts/components/ContactPill.dom.tsx
+@@ -59,7 +59,8 @@ export function ContactPill({
+         title={title}
+         size={AvatarSize.TWENTY}
+       />
+-      <ContactName serviceId={serviceId}
++      <ContactName
++        serviceId={serviceId}
+         firstName={firstName}
+         className="module-ContactPill__contact-name"
+         preferFirstName
+diff --git a/ts/components/GroupCallRemoteParticipant.dom.tsx b/ts/components/GroupCallRemoteParticipant.dom.tsx
+index 2f7062b43..f671c7775 100644
+--- a/ts/components/GroupCallRemoteParticipant.dom.tsx
++++ b/ts/components/GroupCallRemoteParticipant.dom.tsx
+@@ -398,7 +398,8 @@ export const GroupCallRemoteParticipant: FC<PropsType> = memo(
+       }
+ 
+       const nameElement = (
+-        <ContactName serviceId={serviceId}
++        <ContactName
++          serviceId={serviceId}
+           className="module-ongoing-call__group-call-remote-participant__info__contact-name"
+           title={title}
+         />
+diff --git a/ts/components/GroupDialog.dom.tsx b/ts/components/GroupDialog.dom.tsx
+index 9227b212b..31539738a 100644
+--- a/ts/components/GroupDialog.dom.tsx
++++ b/ts/components/GroupDialog.dom.tsx
+@@ -115,7 +115,8 @@ function Contacts({
+             size={AvatarSize.TWENTY_EIGHT}
+             i18n={i18n}
+           />
+-          <ContactName serviceId={contact.serviceId}
++          <ContactName
++            serviceId={contact.serviceId}
+             className="module-GroupDialog__contacts__contact__name"
+             title={contact.title}
+           />
+diff --git a/ts/components/conversation/ContactSpoofingReviewDialogPerson.dom.tsx b/ts/components/conversation/ContactSpoofingReviewDialogPerson.dom.tsx
+index 5e19c9c5a..2b0e27790 100644
+--- a/ts/components/conversation/ContactSpoofingReviewDialogPerson.dom.tsx
++++ b/ts/components/conversation/ContactSpoofingReviewDialogPerson.dom.tsx
+@@ -66,7 +66,8 @@ export function ContactSpoofingReviewDialogPerson({
+   }
+ 
+   const name = (
+-    <ContactName serviceId={conversation.serviceId}
++    <ContactName
++      serviceId={conversation.serviceId}
+       className="module-ContactSpoofingReviewDialogPerson__info__contact-name"
+       title={conversation.title}
+     />
+diff --git a/ts/components/conversation/SafetyNumberNotification.dom.tsx b/ts/components/conversation/SafetyNumberNotification.dom.tsx
+index 1585d7684..395e765ce 100644
+--- a/ts/components/conversation/SafetyNumberNotification.dom.tsx
++++ b/ts/components/conversation/SafetyNumberNotification.dom.tsx
+@@ -35,7 +35,13 @@ export function SafetyNumberNotification({
+   i18n,
+   toggleSafetyNumberModal,
+ }: Props): JSX.Element {
+-  const name = <ContactName serviceId={contact.serviceId} key="external-1" title={contact.title} />;
++  const name = (
++    <ContactName
++      serviceId={contact.serviceId}
++      key="external-1"
++      title={contact.title}
++    />
++  );
+   return (
+     <SystemMessage
+       icon="safety-number"
+diff --git a/ts/components/conversation/VerificationNotification.dom.tsx b/ts/components/conversation/VerificationNotification.dom.tsx
+index d6c2861e3..6a1568b2b 100644
+--- a/ts/components/conversation/VerificationNotification.dom.tsx
++++ b/ts/components/conversation/VerificationNotification.dom.tsx
+@@ -34,7 +34,13 @@ function VerificationNotificationContents({
+   type,
+   i18n,
+ }: Props) {
+-  const name = <ContactName serviceId={contact.serviceId} key="external-1" title={contact.title} />;
++  const name = (
++    <ContactName
++      serviceId={contact.serviceId}
++      key="external-1"
++      title={contact.title}
++    />
++  );
+ 
+   switch (type) {
+     case 'markVerified':
+diff --git a/ts/components/conversation/poll-message/PollVotesModal.dom.tsx b/ts/components/conversation/poll-message/PollVotesModal.dom.tsx
+index 390e0ce2e..6203487c4 100644
+--- a/ts/components/conversation/poll-message/PollVotesModal.dom.tsx
++++ b/ts/components/conversation/poll-message/PollVotesModal.dom.tsx
+@@ -122,7 +122,8 @@ export function PollVotesModal({
+                             title={vote.from.title}
+                           />
+                           <div className={tw('min-w-0 flex-1')}>
+-                            <ContactName serviceId={vote.from.serviceId}
++                            <ContactName
++                              serviceId={vote.from.serviceId}
+                               title={vote.from.title}
+                               className={tw('type-body-large text-primary')}
+                             />
+diff --git a/ts/components/conversationList/ContactCheckbox.dom.tsx b/ts/components/conversationList/ContactCheckbox.dom.tsx
+index 2aaac408a..4c05c27f0 100644
+--- a/ts/components/conversationList/ContactCheckbox.dom.tsx
++++ b/ts/components/conversationList/ContactCheckbox.dom.tsx
+@@ -71,13 +71,15 @@ export const ContactCheckbox: FunctionComponent<PropsType> = memo(
+     const disabled = Boolean(disabledReason);
+ 
+     const headerName = isMe ? (
+-      <ContactName serviceId={serviceId}
++      <ContactName
++        serviceId={serviceId}
+         className="module-conversation-list__item--contact-or-conversation__content__header__name__contact-name"
+         title={i18n('icu:noteToSelf')}
+         isMe={isMe}
+       />
+     ) : (
+-      <ContactName serviceId={serviceId}
++      <ContactName
++        serviceId={serviceId}
+         className="module-conversation-list__item--contact-or-conversation__content__header__name__contact-name"
+         title={title}
+       />
+diff --git a/ts/components/conversationList/ContactListItem.dom.tsx b/ts/components/conversationList/ContactListItem.dom.tsx
+index 5eb73c920..527fe8288 100644
+--- a/ts/components/conversationList/ContactListItem.dom.tsx
++++ b/ts/components/conversationList/ContactListItem.dom.tsx
+@@ -140,7 +140,8 @@ export const ContactListItem: FunctionComponent<PropsType> = memo(
+     );
+ 
+     const headerName = isMe ? (
+-      <ContactName serviceId={serviceId}
++      <ContactName
++        serviceId={serviceId}
+         isMe={isMe}
+         className="module-conversation-list__item--contact-or-conversation__content__header__name__contact-name"
+         title={i18n('icu:noteToSelf')}
+diff --git a/ts/components/conversationList/ConversationListItem.dom.tsx b/ts/components/conversationList/ConversationListItem.dom.tsx
+index f665c3436..dc8c16e71 100644
+--- a/ts/components/conversationList/ConversationListItem.dom.tsx
++++ b/ts/components/conversationList/ConversationListItem.dom.tsx
+@@ -111,7 +111,8 @@ export const ConversationListItem: FunctionComponent<Props> = memo(
+     const headerName = (
+       <>
+         {isMe ? (
+-          <ContactName serviceId={serviceId}
++          <ContactName
++            serviceId={serviceId}
+             className="module-conversation-list__item--contact-or-conversation__content__header__name__contact-name"
+             isMe={isMe}
+             title={i18n('icu:noteToSelf')}

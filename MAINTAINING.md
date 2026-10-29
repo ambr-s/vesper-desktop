@@ -23,7 +23,23 @@ For a source change:
 the pin. Advance the pin only after resolving patch conflicts and passing the
 same checks.
 
-### Signal v8.32 candidate
+### Signal v8.33 candidate
+
+The v8.33.0 candidate and the previous v8.32.0 pin passed the complete
+artifact-only gate in run `40845745713` before advancing `upstream.pin`.
+`patches/signal-8.33/` carries the rebase, selected by the actual upstream tag;
+`patches/signal-8.32/` remains byte-identical for reproducibility. The final
+pin commit must also pass both build jobs, including Debian, AppImage,
+Flatpak and encrypted-key restart tests. Pin advancement is not publication.
+
+The candidate preserves upstream's `PreferencesList`, contact-name class API,
+static class-name checks and theme helper overload. Removed unused gradient
+variables are not restored. Vesper's logging and deletion confirmations,
+author badges, seven-click internal settings, support routing and brand-theme
+selection remain downstream features. Release keys and signing gates are
+unchanged.
+
+### Signal v8.32 rebase history
 
 The v8.25 pin and its top-level `patches/*.patch` series remain unchanged until
 both package and Flatpak validation pass. `patches/signal-8.32/` holds the
