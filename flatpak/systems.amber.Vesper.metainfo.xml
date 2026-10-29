@@ -27,15 +27,7 @@
     <binary>vesper-desktop</binary>
     <id>vesper-desktop.desktop</id>
   </provides>
-  <releases>
-    <release version="8.20.0" date="2026-07-25">
-      <description>
-        <p>
-          Packages Vesper Desktop 8.20.0 for Linux with an independently
-          installable Flatpak.
-        </p>
-      </description>
-    </release>
-  </releases>
+  <!-- Populated from the built Debian payload by tools/flatpak_metadata.py. -->
+  <releases />
   <content_rating type="oars-1.1" />
 </component>

@@ -133,7 +133,15 @@ placeholder public keys.
 
 `tools/build-flatpak.sh` packages the current Debian build with the
 `org.freedesktop.Platform` 25.08 runtime and Electron2 BaseApp. It refuses a
-Debian package older than the current source commit. `tools/test-flatpak.sh`
+Debian package older than the current source commit. AppStream is generated into
+`artifacts/flatpak/source/` from the Debian payload's embedded `package.json`;
+the Debian control version and materialised source version must agree. Its UTC
+release date uses the source commit epoch (the build's `SOURCE_DATE_EPOCH`),
+not a hand-maintained date or the packaging host's timezone. `tools/test-flatpak.sh`
+audits the version/date in both the build tree and the installed bundle against
+their actual ASAR payloads before completing the existing runtime checks. This
+is a future-build repair: never replace an already published tag or artifact
+solely to correct its catalogue metadata. `tools/test-flatpak.sh`
 checks the completed bundle tree's desktop and protocol identity and confirms
 the Electron version without installing, replacing or stopping the user's
 Vesper app. It starts that isolated build twice with temporary application data.

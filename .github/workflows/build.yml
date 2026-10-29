@@ -42,6 +42,7 @@ jobs:
           python3 tools/test_export_patches.py -v
           python3 tools/test_patch_series.py -v
           python3 tools/test_release_signing.py -v
+          python3 tools/test_flatpak_metadata.py -v
           python3 -m py_compile tools/export_patches.py tools/test_export_patches.py tools/patch_series.py tools/test_patch_series.py tools/test_chat_refresh_identity.py
           bash -n tools/export.sh tools/materialize.sh tools/verify-materialised.sh
 

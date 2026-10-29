@@ -67,7 +67,7 @@ modules:
       - type: file
         path: vesper-desktop.sh
       - type: file
-        path: systems.amber.Vesper.metainfo.xml
+        path: ../artifacts/flatpak/source/systems.amber.Vesper.metainfo.xml
       - type: file
         path: ../LICENSE
         dest-filename: LICENSE

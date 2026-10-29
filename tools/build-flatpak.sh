@@ -70,6 +70,12 @@ reset_generated_directory "$STATE_DIR"
 reset_generated_directory "$REPO_DIR"
 find "$BUNDLE" -maxdepth 0 -type f -delete 2>/dev/null || true
 cp --reflink=auto "$DEB" "$SOURCE_DIR/vesper-desktop.deb"
+python3 "$ROOT/tools/flatpak_metadata.py" generate \
+  --work "$WORK" \
+  --deb "$SOURCE_DIR/vesper-desktop.deb" \
+  --metadata "$ROOT/flatpak/$APP_ID.metainfo.xml" \
+  --epoch "$SOURCE_COMMIT_TIME" \
+  --output "$SOURCE_DIR/$APP_ID.metainfo.xml"
 
 if ! flatpak remotes --user --columns=name | grep -Fxq flathub; then
   flatpak remote-add \
