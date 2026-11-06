@@ -79,6 +79,9 @@ jobs:
       - name: Install Linux build dependencies
         run: |
           sudo apt-get install -y \
+            apt-utils \
+            gnupg \
+            ostree \
             dbus-daemon \
             flatpak \
             flatpak-builder \
@@ -89,6 +92,9 @@ jobs:
             (
               sudo apt-get update &&
               sudo apt-get install -y \
+                apt-utils \
+                gnupg \
+                ostree \
                 dbus-daemon \
                 flatpak \
                 flatpak-builder \
@@ -97,6 +103,9 @@ jobs:
                 libpulse0 \
                 xvfb
             )
+
+      - name: Test signed Linux repository publication
+        run: python3 tools/test_linux_repositories.py -v
 
       - name: Build and validate Vesper
         run: ./tools/build-local.sh

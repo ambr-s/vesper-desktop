@@ -106,7 +106,9 @@ cp -- "$DEBIAN_PACKAGE" "$POOL_DIR/$(basename -- "$DEBIAN_PACKAGE")"
     -o APT::FTPArchive::Release::Components=main \
     -o APT::FTPArchive::Release::Description="Vesper Desktop packages" \
     release dists/stable \
-    > dists/stable/Release
+    > Release.pending
+  # Keep output outside the indexed tree until all hashes are complete.
+  mv -- Release.pending dists/stable/Release
 )
 
 GPG_OPTIONS=(
@@ -155,6 +157,9 @@ flatpak build-sign \
   "$FLATPAK_REPO" \
   "$APP_ID" \
   "$FLATPAK_BRANCH"
+# Deltas embed detached commit metadata. Never reuse a delta made before signing,
+# even though signing leaves the commit checksum unchanged.
+reset_generated_directory "$FLATPAK_REPO/deltas"
 flatpak build-update-repo \
   --title=Vesper \
   --comment="Private Signal messaging with Vesper privacy controls" \
