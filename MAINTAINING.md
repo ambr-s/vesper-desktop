@@ -37,12 +37,15 @@ both single and multiple invited contacts. Registration uses the existing owned
 Vesper artwork in both theme branches and retains the upstream positioning.
 
 Fresh candidate replay and a second export reproduce tree
-`c6818c79c8cec2fee91f07ef9802c65412db4c13` with identical patch and overlay bytes.
+`f852aa0ebe97bbcc7433beb8de2c1e73af7f8051` with identical patch and overlay bytes.
 Local generation, formatting, type checking, source lint and 383 lint-rule tests
-pass. Local `build-local.sh` reaches the Electron tests but the container's
-`xvfb-run` waits for a readiness signal; complete package and Flatpak evidence
-must come from the unchanged full CI gate. Do not advance the pin or publish
-until both complete build legs pass. Signing gates and trust roots are unchanged.
+pass. Electron tests pass against the ready local X server, and Debian and
+AppImage packaging completes. Local Flatpak execution is blocked by the container
+namespace policy; full CI covers Flatpak and encrypted-key restart tests. The
+initial matrix run 42191265660 passed both legs. The final follow-up retains
+author badges in the migrated group dialog and requires its own full matrix run.
+Do not advance the pin or publish until both legs pass at the final head.
+Signing gates and trust roots are unchanged.
 
 ### Signal v8.33 candidate
 

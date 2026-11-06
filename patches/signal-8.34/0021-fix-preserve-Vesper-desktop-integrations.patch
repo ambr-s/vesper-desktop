@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Fri, 21 Aug 2026 14:41:13 +0000
-Subject: [PATCH 21/27] fix: preserve Vesper desktop integrations
+Subject: [PATCH 21/28] fix: preserve Vesper desktop integrations
 
 Signed-off-by: amber <amber@flourish.ch>
 ---

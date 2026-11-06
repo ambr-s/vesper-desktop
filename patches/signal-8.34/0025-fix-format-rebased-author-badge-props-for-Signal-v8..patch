@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Thu, 29 Oct 2026 08:43:00 +0000
-Subject: [PATCH 25/27] fix: format rebased author badge props for Signal v8.33
+Subject: [PATCH 25/28] fix: format rebased author badge props for Signal v8.33
 
 Signed-off-by: amber <amber@flourish.ch>
 ---
