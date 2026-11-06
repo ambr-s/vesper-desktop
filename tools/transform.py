@@ -437,18 +437,7 @@ def transform_miscellaneous_identity(checkout: Path) -> None:
         "../images/vesper-logo.svg",
         1,
     )
-    replace_exact(
-        checkout / "stylesheets/components/InstallScreenSignalLogo.scss",
-        "../images/signal-logo-and-wordmark.svg",
-        "../images/vesper-logo-and-wordmark.svg",
-        1,
-    )
-    replace_exact(
-        checkout / "ts/components/standaloneRegistration/StandaloneRegistration.dom.tsx",
-        "images/signal-logo-with-text.svg",
-        "images/vesper-logo-with-text.svg",
-        1,
-    )
+    transform_registration_identity(checkout)
     replace_exact(
         checkout / "background.html",
         "images/signal-logo.svg",
@@ -473,6 +462,28 @@ def transform_miscellaneous_identity(checkout: Path) -> None:
         checkout / "scripts/sign-mas-installer.mjs",
     ):
         path.unlink()
+
+
+def transform_registration_identity(checkout: Path) -> None:
+    legacy = checkout / "stylesheets/components/InstallScreenSignalLogo.scss"
+    standalone = checkout / "ts/components/standaloneRegistration/StandaloneRegistration.dom.tsx"
+    if legacy.exists():
+        replace_exact(legacy, "../images/signal-logo-and-wordmark.svg",
+                      "../images/vesper-logo-and-wordmark.svg", 1)
+        replace_exact(standalone, "images/signal-logo-with-text.svg",
+                      "images/vesper-logo-with-text.svg", 1)
+    else:
+        # v8.34 moves the install logo into Axo. Keep its positioning wrapper,
+        # but use the existing owned Vesper artwork rather than Signal's paths.
+        install = checkout / "ts/components/installScreen/InstallScreenSignalLogo.dom.tsx"
+        replace_exact(install, "import { AxoBrand } from '../../axo/AxoBrand.dom.tsx';\n", "", 1)
+        replace_exact(install, '<AxoBrand.LogoAndWordMark maxWidth={112} />',
+                      '\n'.join(('<img', '        src="images/vesper-logo-and-wordmark.svg"',
+                                 '        width={112}', '        alt="Vesper"', '      />')), 1)
+        for path in (standalone, checkout / "ts/components/EntryPoint.dom.tsx"):
+            for theme in ("light", "dark"):
+                replace_exact(path, f"images/signal-logo-with-text--{theme}.svg",
+                              "images/vesper-logo-with-text.svg", 1)
 
 
 def main() -> int:

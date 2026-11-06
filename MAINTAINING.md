@@ -23,6 +23,27 @@ For a source change:
 the pin. Advance the pin only after resolving patch conflicts and passing the
 same checks.
 
+### Signal v8.34 candidate
+
+The artifact-only matrix tests the v8.33.0 pin and v8.34.0 candidate independently.
+The published pin and older patch series remain unchanged. The candidate series
+in `patches/signal-8.34/` preserves patch authors, dates, messages and DCO trailers.
+
+Signal moved registration branding into Axo, renamed `model-types.d.ts` to
+`model-types.std.ts`, replaced the group invitation dialog, and changed settings
+and story context. The rebase keeps the new upstream layouts, bubble-colour API,
+language dialog and story context menu. Vesper's author badges also remain on
+both single and multiple invited contacts. Registration uses the existing owned
+Vesper artwork in both theme branches and retains the upstream positioning.
+
+Fresh candidate replay and a second export reproduce tree
+`c6818c79c8cec2fee91f07ef9802c65412db4c13` with identical patch and overlay bytes.
+Local generation, formatting, type checking, source lint and 383 lint-rule tests
+pass. Local `build-local.sh` reaches the Electron tests but the container's
+`xvfb-run` waits for a readiness signal; complete package and Flatpak evidence
+must come from the unchanged full CI gate. Do not advance the pin or publish
+until both complete build legs pass. Signing gates and trust roots are unchanged.
+
 ### Signal v8.33 candidate
 
 The v8.33.0 candidate and the previous v8.32.0 pin passed the complete

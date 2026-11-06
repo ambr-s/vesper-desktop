@@ -1,0 +1,56 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Fri, 6 Nov 2026 08:46:44 +0000
+Subject: [PATCH 27/27] fix: format Signal v8.34 branding and invitation badges
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ .../NewlyCreatedGroupInvitedContactsDialog.dom.tsx     | 10 ++++++++--
+ .../installScreen/InstallScreenSignalLogo.dom.tsx      |  6 +-----
+ 2 files changed, 9 insertions(+), 7 deletions(-)
+
+diff --git a/ts/components/NewlyCreatedGroupInvitedContactsDialog.dom.tsx b/ts/components/NewlyCreatedGroupInvitedContactsDialog.dom.tsx
+index d16848592..93d84e7d8 100644
+--- a/ts/components/NewlyCreatedGroupInvitedContactsDialog.dom.tsx
++++ b/ts/components/NewlyCreatedGroupInvitedContactsDialog.dom.tsx
+@@ -43,7 +43,11 @@ export function NewlyCreatedGroupInvitedContactsDialog(
+       <I18n
+         i18n={i18n}
+         id="icu:NewlyCreatedGroupInvitedContactsDialog--body--user-paragraph--one"
+-        components={{ name: <ContactName serviceId={contact.serviceId} title={contact.title} /> }}
++        components={{
++          name: (
++            <ContactName serviceId={contact.serviceId} title={contact.title} />
++          ),
++        }}
+       />
+     );
+   } else {
+@@ -139,7 +143,9 @@ function InvitedContactItem(props: InvitedContactItemProps): ReactNode {
+           title={contact.title}
+         />
+       }
+-      title={<ContactName serviceId={contact.serviceId} title={contact.title} />}
++      title={
++        <ContactName serviceId={contact.serviceId} title={contact.title} />
++      }
+     />
+   );
+ }
+diff --git a/ts/components/installScreen/InstallScreenSignalLogo.dom.tsx b/ts/components/installScreen/InstallScreenSignalLogo.dom.tsx
+index c49adc1d4..7a92b2afe 100644
+--- a/ts/components/installScreen/InstallScreenSignalLogo.dom.tsx
++++ b/ts/components/installScreen/InstallScreenSignalLogo.dom.tsx
+@@ -11,11 +11,7 @@ export function InstallScreenSignalLogo(): ReactElement {
+         'absolute inset-s-8 top-[calc(35px+var(--title-bar-drag-area-height))]'
+       )}
+     >
+-      <img
+-        src="images/vesper-logo-and-wordmark.svg"
+-        width={112}
+-        alt="Vesper"
+-      />
++      <img src="images/vesper-logo-and-wordmark.svg" width={112} alt="Vesper" />
+     </div>
+   );
+ }
