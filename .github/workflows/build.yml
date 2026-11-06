@@ -29,9 +29,9 @@ jobs:
           - name: Linux x64
             target: pinned
             tag: ""
-          - name: Linux x64 (Signal v8.33.0 candidate)
-            target: signal-8.33.0
-            tag: v8.33.0
+          - name: Linux x64 (Signal v8.34.0 candidate)
+            target: signal-8.34.0
+            tag: v8.34.0
 
     steps:
       - name: Check out Vesper patchset
@@ -41,6 +41,7 @@ jobs:
         run: |
           python3 tools/test_export_patches.py -v
           python3 tools/test_patch_series.py -v
+          python3 tools/test_registration_identity.py -v
           python3 tools/test_release_signing.py -v
           python3 tools/test_flatpak_metadata.py -v
           python3 -m py_compile tools/export_patches.py tools/test_export_patches.py tools/patch_series.py tools/test_patch_series.py tools/test_chat_refresh_identity.py
