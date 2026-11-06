@@ -158,14 +158,32 @@ for ((attempt = 0; attempt < SMOKE_SECONDS * 4; attempt += 1)); do
     exit 1
   fi
 
-  if [[ "$MODE" == await-config && -f "$SMOKE_ROOT/Vesper/config.json" ]]; then
+  # getSQLKey saves encryptedKey and safeStorageBackend in separate atomic
+  # writes. File existence (or encryptedKey alone) is not readiness: stopping
+  # here used to interrupt the writer before the backend was persisted.
+  if [[ "$MODE" == await-config ]] && node -e '
+    const fs = require("node:fs");
+    try {
+      const config = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      process.exit(
+        config !== null &&
+        config.safeStorageBackend === "gnome_libsecret" &&
+        typeof config.encryptedKey === "string" &&
+        /^[0-9a-f]+$/u.test(config.encryptedKey) &&
+        !Object.hasOwn(config, "key") ? 0 : 1
+      );
+    } catch {
+      // Missing or incomplete JSON is not ready; the bounded poll retries.
+      process.exit(1);
+    }
+  ' "$SMOKE_ROOT/Vesper/config.json"; then
     exit 0
   fi
   sleep 0.25
 done
 
 if [[ "$MODE" == await-config ]]; then
-  echo "Flatpak did not create config.json within ${SMOKE_SECONDS}s." >&2
+  echo "Flatpak did not persist an encrypted gnome_libsecret config with no plaintext key within ${SMOKE_SECONDS}s." >&2
   find "$SMOKE_ROOT" -maxdepth 2 -type f -printf '%P\n' >&2
   exit 1
 fi
