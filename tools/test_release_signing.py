@@ -27,6 +27,38 @@ def signing_step():
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_both_release_jobs_select_the_signed_tag_not_published_pin(self):
+        workflow = (ROOT / '.github/workflows/release.yml').read_text()
+        selection = '''      - name: Materialise Vesper
+        env:
+          RELEASE_SIGNAL_TAG: ${{ github.ref_name }}
+        run: ./tools/materialize.sh --tag "$RELEASE_SIGNAL_TAG"'''
+        self.assertEqual(workflow.count(selection), 2)
+        # Exercise the actual command with a recorder, including shell metacharacters.
+        command = selection.split('        run: ', 1)[1]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            (path / 'tools').mkdir()
+            recorder = path / 'tools/materialize.sh'
+            recorder.write_text('#!/bin/bash\nprintf "%s\\n" "$@" > arguments\n')
+            recorder.chmod(0o755)
+            for tag in ('v8.35.0', 'main', 'v8.35.0; touch injected'):
+                with self.subTest(tag=tag):
+                    subprocess.run(['bash', '-euo', 'pipefail', '-c', command],
+                                   cwd=path, env=dict(os.environ, RELEASE_SIGNAL_TAG=tag),
+                                   check=True)
+                    self.assertEqual((path / 'arguments').read_text().splitlines(),
+                                     ['--tag', tag])
+                    self.assertFalse((path / 'injected').exists())
+
+    def test_materializer_rejects_non_release_ref_before_cloning(self):
+        for tag in ('main', 'v8.35.0-beta.1', 'v8.35.0; touch injected'):
+            with self.subTest(tag=tag):
+                result = subprocess.run([str(ROOT / 'tools/materialize.sh'), '--tag', tag],
+                                        capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('Invalid Signal tag:', result.stderr)
+
     def test_checkout_free_publish_has_repository_context(self):
         workflow = (ROOT / '.github/workflows/release.yml').read_text()
         publish = workflow.split('\n  publish:', 1)[1]
@@ -92,6 +124,13 @@ class ReleaseSigningTests(unittest.TestCase):
                                (self.path / 'other.pub').read_text())
         self.git('config', 'gpg.ssh.allowedSignersFile', str(other_trust))
         self.assert_rejected('No principal matched')
+
+    def test_published_pin_does_not_select_release_source(self):
+        (self.path / 'upstream.pin').write_text('signal=v1.2.2\n')
+        result = self.gate()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.path / 'output').read_text(), 'version=1.2.3\n')
+        self.assertEqual((self.path / 'upstream.pin').read_text(), 'signal=v1.2.2\n')
 
     def test_wrong_tag_commit(self):
         self.git('commit', '--allow-empty', '-qm', 'different build commit')

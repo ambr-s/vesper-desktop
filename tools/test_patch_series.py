@@ -41,8 +41,8 @@ class PatchSeriesTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "empty"):
             series_path(self.root, "v8.33.0")
 
-    def test_834_and_newer_use_rebased_series(self):
-        for tag in ("v8.34.0", "v8.34.1", "v9.0.0"):
+    def test_published_834_keeps_its_series(self):
+        for tag in ("v8.34.0", "v8.34.1"):
             with self.subTest(tag=tag):
                 self.assertEqual(series_path(self.root, tag),
                                  self.root / "patches/signal-8.34")
@@ -51,6 +51,18 @@ class PatchSeriesTest(unittest.TestCase):
         (self.root / "patches/signal-8.34/0001.patch").unlink()
         with self.assertRaisesRegex(ValueError, "empty"):
             series_path(self.root, "v8.34.0")
+
+    def test_835_and_newer_use_rebased_series(self):
+        path = self.root / "patches/signal-8.35"
+        path.mkdir()
+        (path / "0001.patch").write_text("fixture")
+        for tag in ("v8.35.0", "v8.35.1", "v9.0.0"):
+            with self.subTest(tag=tag):
+                self.assertEqual(series_path(self.root, tag), path)
+
+    def test_missing_835_never_falls_back(self):
+        with self.assertRaisesRegex(ValueError, "empty"):
+            series_path(self.root, "v8.35.0")
 
     def test_reject_malformed_tags(self):
         for tag in ("8.32.0", "v8.32", "v8.32.0-beta", "v8.32.0\n", "../v8.32.0"):

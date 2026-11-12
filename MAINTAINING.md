@@ -23,6 +23,33 @@ For a source change:
 the pin. Advance the pin only after resolving patch conflicts and passing the
 same checks.
 
+### Signal v8.35 candidate
+
+The artifact-only matrix tests the published v8.34.0 pin and v8.35.0 candidate
+independently. The required `Linux x64` check name, package and Flatpak gates,
+and independent artifact names are retained. Neither leg publishes.
+
+`patches/signal-8.35/` preserves all 28 existing feature commits and their original
+author, date, message and DCO trailer. Patch 26 removes its unused lint suppression
+at upstream's reformatted `FunPopover` class list, retaining the new
+`legacy-z-index-popup` class and explicit z-index override. Patch 29 removes the
+same unused suppression from the new Axo test helper: Vesper styles `light-theme`
+directly, so the upstream Tailwind-only exception is unnecessary. Both theme
+toggles and document direction setup remain unchanged. The published v8.34 series
+and pin remain byte-identical.
+
+Fresh replay reproduces tree `909cf8ec190cbab2d1ce748d360b1d1e39fee236`.
+A second export preserves the complete patch and overlay inventory and bytes.
+The patch-tooling suite passes locally (84 tests). Full packaging and Flatpak
+validation must pass on both matrix legs at the final PR head before merging.
+
+Release materialisation selects the exact dispatch tag in both verification and
+build jobs, rather than the published pin. The existing gate still requires an
+annotated SSH tag signed by the pinned authority, matching the materialised
+version, checkout commit and remote tag object. This permits publication of a
+qualified candidate without changing the published pin first. Advance the pin
+only after checking the public release, updater and package repositories.
+
 ### Signal v8.34 candidate
 
 The artifact-only matrix tests the v8.33.0 pin and v8.34.0 candidate independently.

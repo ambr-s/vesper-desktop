@@ -29,9 +29,9 @@ jobs:
           - name: Linux x64
             target: pinned
             tag: ""
-          - name: Linux x64 (Signal v8.34.0 candidate)
-            target: signal-8.34.0
-            tag: v8.34.0
+          - name: Linux x64 (Signal v8.35.0 candidate)
+            target: signal-8.35.0
+            tag: v8.35.0
 
     steps:
       - name: Check out Vesper patchset
