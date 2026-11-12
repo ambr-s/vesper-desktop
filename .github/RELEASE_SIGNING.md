@@ -7,6 +7,11 @@ signature namespace. The label `vesper-release` is a trust principal, not a
 requirement on the tagger's email address. No private signing material belongs in
 this repository. Key rotation requires a reviewed change to this trust file.
 
+The release jobs materialise the Signal tag named by the dispatch ref, not
+`upstream.pin`. The pin remains the published release until public verification
+succeeds; both release jobs select the same tag and the signature/version/head
+checks below remain mandatory.
+
 The workflow verifies all of the following before building:
 
 - The dispatch ref equals `refs/tags/v<materialised package version>`.

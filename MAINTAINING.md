@@ -40,9 +40,15 @@ and pin remain byte-identical.
 
 Fresh replay reproduces tree `909cf8ec190cbab2d1ce748d360b1d1e39fee236`.
 A second export preserves the complete patch and overlay inventory and bytes.
-The patch-tooling suite passes locally (81 tests). Full packaging and Flatpak
+The patch-tooling suite passes locally (84 tests). Full packaging and Flatpak
 validation must pass on both matrix legs at the final PR head before merging.
-Pin advancement, signed-tag approval and publication remain separate gates.
+
+Release materialisation selects the exact dispatch tag in both verification and
+build jobs, rather than the published pin. The existing gate still requires an
+annotated SSH tag signed by the pinned authority, matching the materialised
+version, checkout commit and remote tag object. This permits publication of a
+qualified candidate without changing the published pin first. Advance the pin
+only after checking the public release, updater and package repositories.
 
 ### Signal v8.34 candidate
 
