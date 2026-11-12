@@ -14,7 +14,9 @@ def series_path(root: pathlib.Path, tag: str) -> pathlib.Path:
         raise ValueError(f"Invalid Signal tag: {tag!r}")
     version = tuple(int(value) for value in match.groups())
     path = root / "patches"
-    if version >= (8, 34, 0):
+    if version >= (8, 35, 0):
+        path /= "signal-8.35"
+    elif version >= (8, 34, 0):
         path /= "signal-8.34"
     elif version >= (8, 33, 0):
         path /= "signal-8.33"

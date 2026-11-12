@@ -23,6 +23,24 @@ For a source change:
 the pin. Advance the pin only after resolving patch conflicts and passing the
 same checks.
 
+### Signal v8.35 candidate
+
+The artifact-only matrix tests the published v8.34.0 pin and v8.35.0 candidate
+independently. The required `Linux x64` check name, package and Flatpak gates,
+and independent artifact names are retained. Neither leg publishes.
+
+`patches/signal-8.35/` preserves all 28 feature commits and their original author,
+date, message and DCO trailer. Only patch 26 changes: its removal of an unused
+lint suppression follows upstream's reformatted `FunPopover` class list, retaining
+the new `legacy-z-index-popup` class and upstream's explicit z-index override.
+The published v8.34 series and pin remain byte-identical.
+
+Fresh replay reproduces tree `e4767ebdd55761678010f91ea05c064e26e65e99`.
+A second export preserves the complete patch and overlay inventory and bytes.
+The patch-tooling suite passes locally (81 tests). Full packaging and Flatpak
+validation must pass on both matrix legs at the final PR head before merging.
+Pin advancement, signed-tag approval and publication remain separate gates.
+
 ### Signal v8.34 candidate
 
 The artifact-only matrix tests the v8.33.0 pin and v8.34.0 candidate independently.
