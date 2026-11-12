@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sat, 15 Aug 2026 08:41:05 +0000
-Subject: [PATCH 18/28] fix: use generated Vesper localization signatures
+Subject: [PATCH 18/29] fix: use generated Vesper localization signatures
 
 Signed-off-by: amber <amber@flourish.ch>
 ---

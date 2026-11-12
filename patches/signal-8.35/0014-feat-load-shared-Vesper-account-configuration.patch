@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Mon, 27 Jul 2026 16:29:51 +0100
-Subject: [PATCH 14/28] feat: load shared Vesper account configuration
+Subject: [PATCH 14/29] feat: load shared Vesper account configuration
 
 Cache and refresh the per-account Vesper config outside startup, apply account-specific flag overrides, and derive developer identity only from the hashed remote list. Show that verified identity throughout contact surfaces and on the contact information card. Also finish deletion-pill layout and Vesper-owned source attribution fixes.
 

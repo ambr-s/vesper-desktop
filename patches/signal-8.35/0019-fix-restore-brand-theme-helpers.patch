@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Fri, 21 Aug 2026 14:21:34 +0000
-Subject: [PATCH 19/28] fix: restore brand theme helpers
+Subject: [PATCH 19/29] fix: restore brand theme helpers
 
 Signed-off-by: amber <amber@flourish.ch>
 ---

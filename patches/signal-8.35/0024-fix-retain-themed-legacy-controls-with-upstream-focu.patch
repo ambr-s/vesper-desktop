@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Sun, 25 Oct 2026 21:48:05 +0000
-Subject: [PATCH 24/28] fix: retain themed legacy controls with upstream focus
+Subject: [PATCH 24/29] fix: retain themed legacy controls with upstream focus
  rings
 
 Signed-off-by: amber <amber@flourish.ch>

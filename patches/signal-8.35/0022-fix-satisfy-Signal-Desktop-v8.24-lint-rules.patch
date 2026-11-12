@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Fri, 21 Aug 2026 14:48:52 +0000
-Subject: [PATCH 22/28] fix: satisfy Signal Desktop v8.24 lint rules
+Subject: [PATCH 22/29] fix: satisfy Signal Desktop v8.24 lint rules
 
 Signed-off-by: amber <amber@flourish.ch>
 ---

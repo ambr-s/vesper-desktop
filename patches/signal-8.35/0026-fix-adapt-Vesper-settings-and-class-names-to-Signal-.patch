@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: amber <amber@flourish.ch>
 Date: Thu, 29 Oct 2026 08:46:48 +0000
-Subject: [PATCH 26/28] fix: adapt Vesper settings and class names to Signal
+Subject: [PATCH 26/29] fix: adapt Vesper settings and class names to Signal
  v8.33
 
 Signed-off-by: amber <amber@flourish.ch>
