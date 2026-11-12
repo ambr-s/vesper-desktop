@@ -23,6 +23,29 @@ For a source change:
 the pin. Advance the pin only after resolving patch conflicts and passing the
 same checks.
 
+### Signal v8.35 publication
+
+Compatibility PR #30 passed both full matrix legs in run `43186858322`, then
+merged as `330a120d1637a2a9d3de071845fe9ba17ee6a8d1`. The exact merged commit
+passed both legs again in run `43188553390`. Its annotated `v8.35.0` tag verifies
+against the unchanged pinned SSH authority. Release run `43189969162` passed the
+signed-tag gate, full package and Flatpak tests, signing and publication.
+
+Public verification confirms version 8.35.0 in the updater, Debian payload and
+installed Flatpak payload/AppStream. All eight public release assets match the
+GitHub SHA-256 digests; release checksums, updater SHA-512 values and both updater
+signatures verify. The APT key is byte-identical to the previous release, and
+`InRelease` and its metadata-to-package hash chain verify. The public Flatpak
+summary and commit signatures verify, a required-static-delta HTTP pull succeeds,
+and a fresh isolated default Flatpak installation completes successfully at commit
+`e696650340f0deff248428fe3d7459e5503d23bac8e6dbfaffe49f235dfeda97`.
+
+The local container cannot launch Flatpak because its namespace policy rejects
+bubblewrap. This does not prevent public installation or signature verification;
+the exact release workflow passed the encrypted-key restart smoke test on its
+runner. Only after these publication checks is `upstream.pin` advanced to v8.35.0.
+Older patch series remain available for reproducibility.
+
 ### Signal v8.35 candidate
 
 The artifact-only matrix tests the published v8.34.0 pin and v8.35.0 candidate
