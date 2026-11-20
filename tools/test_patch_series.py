@@ -56,9 +56,18 @@ class PatchSeriesTest(unittest.TestCase):
         path = self.root / "patches/signal-8.35"
         path.mkdir()
         (path / "0001.patch").write_text("fixture")
-        for tag in ("v8.35.0", "v8.35.1", "v9.0.0"):
+        for tag in ("v8.35.0", "v8.35.1"):
             with self.subTest(tag=tag):
                 self.assertEqual(series_path(self.root, tag), path)
+
+    def test_836_selects_its_own_nonempty_series(self):
+        with self.assertRaisesRegex(ValueError, "empty"):
+            series_path(self.root, "v8.36.0")
+        path = self.root / "patches/signal-8.36"
+        path.mkdir()
+        (path / "0001.patch").write_text("fixture")
+        for tag in ("v8.36.0", "v9.0.0"):
+            self.assertEqual(series_path(self.root, tag), path)
 
     def test_missing_835_never_falls_back(self):
         with self.assertRaisesRegex(ValueError, "empty"):
