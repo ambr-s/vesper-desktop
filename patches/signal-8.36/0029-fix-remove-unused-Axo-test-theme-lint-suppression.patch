@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: amber <amber@flourish.ch>
+Date: Thu, 12 Nov 2026 08:50:43 +0000
+Subject: [PATCH 29/29] fix: remove unused Axo test theme lint suppression
+
+Vesper styles light-theme directly, so the Signal v8.35 Axo test helper no longer needs its Tailwind-only class suppression. Retain both theme toggles and document direction setup.
+
+Signed-off-by: amber <amber@flourish.ch>
+---
+ ts/axo/_test-helpers/render.dom.tsx | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/ts/axo/_test-helpers/render.dom.tsx b/ts/axo/_test-helpers/render.dom.tsx
+index 5220ca868..ae4808609 100644
+--- a/ts/axo/_test-helpers/render.dom.tsx
++++ b/ts/axo/_test-helpers/render.dom.tsx
+@@ -24,7 +24,6 @@ export function applyDocumentEnvironment(
+   direction: AxoIntl.Direction
+ ): void {
+   // Theme classes are styled by Tailwind, not manifest.css
+-  // oxlint-disable-next-line signal-desktop/enforce-class-name-has-styles
+   document.body.classList.toggle('light-theme', theme === 'light');
+   document.body.classList.toggle('dark-theme', theme === 'dark');
+   document.documentElement.setAttribute('dir', direction);
